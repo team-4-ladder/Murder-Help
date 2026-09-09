@@ -70,7 +70,10 @@ const CODE_LENGTH = 8;
 /* ─── 세션 · 장바구니 보관 ───────────────────────────────── */
 /* localStorage 는 사생활 보호 모드나 차단 설정에서 예외를 던지므로 모두 감싼다 */
 const SESSION_KEY = "murderhelp.session";
-const CART_KEY = "murderhelp.cart";
+
+/* 장바구니는 계정마다 따로 보관한다. 로그아웃해도 남아 있다가
+   같은 계정으로 다시 로그인하면 그대로 돌아온다. */
+const cartKeyFor = (accountId: string) => `murderhelp.cart.${accountId}`;
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -108,6 +111,13 @@ type Session = {
 
 /* ─── 주문 ───────────────────────────────────────────────── */
 type CartLine = { id: string; qty: number };
+
+/* 장바구니 담기와 결제는 로그인이 필요하다. 비로그인 상태에서 누른 동작을
+   여기에 담아 두었다가 로그인에 성공하면 이어서 실행한다. */
+type Pending =
+  | { kind: "add"; id: string; qty: number }
+  | { kind: "buy"; id: string; qty: number }
+  | { kind: "checkout" };
 
 type Receiver = {
   name: string;
@@ -882,10 +892,10 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
   const tierColor = TIERS[p.tier].color;
   const tierBright = TIERS[p.tier].brightColor;
 
+  /* HOT — 인기가 가장 많은 상품 · NEW — 새로 등록된 상품 */
   const badgeColors: Record<string, string> = {
     HOT: C.red,
     NEW: "#1a7a3a",
-    VIP: C.redBright,
   };
 
   return (
@@ -939,14 +949,6 @@ function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
         <div className="text-base font-bold mb-2" style={{ color: tierBright, fontFamily: "Share Tech Mono" }}>
           {krw(p.price)}
         </div>
-        {/* progress */}
-        <div className="h-px mb-1" style={{ background: C.panelBorder }}>
-          <div className="h-full" style={{ width: `${Math.min(p.funded, 100)}%`, background: tierColor }} />
-        </div>
-        <div className="flex justify-between text-[10px]" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-          <span>{p.funded}%</span>
-          <span>{p.backers} backers</span>
-        </div>
       </div>
     </div>
   );
@@ -958,7 +960,8 @@ function ProductDetail({
 }: {
   p: Product;
   onBack: () => void;
-  onAddToCart: (qty: number) => void;
+  /* 로그인이 필요해 담기지 않으면 false 를 돌려준다 */
+  onAddToCart: (qty: number) => boolean;
   onBuyNow: (qty: number) => void;
 }) {
   const [qty, setQty] = useState(1);
@@ -972,7 +975,7 @@ function ProductDetail({
   }, [p.id]);
 
   function add() {
-    onAddToCart(qty);
+    if (!onAddToCart(qty)) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1800);
   }
@@ -1000,7 +1003,7 @@ function ProductDetail({
             <span
               className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-widest px-2 py-1"
               style={{
-                background: p.badge === "NEW" ? "#1a7a3a" : p.badge === "VIP" ? C.redBright : C.red,
+                background: p.badge === "NEW" ? "#1a7a3a" : C.red,
                 color: "#fff",
                 fontFamily: "Share Tech Mono",
               }}
@@ -1034,17 +1037,6 @@ function ProductDetail({
 
           <div className="text-3xl font-bold mb-5" style={{ color: t.brightColor, fontFamily: "Share Tech Mono" }}>
             {krw(p.price)}
-          </div>
-
-          {/* 펀딩 */}
-          <div className="mb-6">
-            <div className="h-px mb-1.5" style={{ background: C.panelBorder }}>
-              <div className="h-full" style={{ width: `${Math.min(p.funded, 100)}%`, background: t.color }} />
-            </div>
-            <div className="flex justify-between text-[10px]" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-              <span>{p.funded}% 달성</span>
-              <span>{p.backers} backers</span>
-            </div>
           </div>
 
           <p className="text-sm leading-relaxed mb-6" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif", fontWeight: 300 }}>
@@ -1521,11 +1513,15 @@ function CodeTab({
 /* ─── main app ───────────────────────────────────────────── */
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => read<Session | null>(SESSION_KEY, null));
-  const [cart, setCart] = useState<CartLine[]>(() => read<CartLine[]>(CART_KEY, []));
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    const saved = read<Session | null>(SESSION_KEY, null);
+    return saved ? read<CartLine[]>(cartKeyFor(saved.id), []) : [];
+  });
   const [view, setView] = useState<View>({ name: "list" });
   const [showLogin, setShowLogin] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  const [afterLogin, setAfterLogin] = useState<null | "checkout">(null);
+  /* 로그인이 필요해 막힌 동작. 로그인에 성공하면 이어서 실행한다 */
+  const [afterLogin, setAfterLogin] = useState<Pending | null>(null);
   const [activeCodeTab, setActiveCodeTab] = useState<Tier>(() => {
     const saved = read<Session | null>(SESSION_KEY, null);
     return saved ? tierFor(saved.plays) : "red";
@@ -1537,10 +1533,11 @@ export default function App() {
   const [activeSub, setActiveSub] = useState("전체");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  /* 장바구니는 로그인 상태 유지 여부와 무관하게 이 브라우저에 남는다 */
+  /* 로그인한 계정 앞으로만 저장한다. 로그아웃 상태에서는 담을 수 없으므로
+     저장할 것도 없고, 저장된 장바구니는 다음 로그인 때까지 그대로 남는다. */
   useEffect(() => {
-    write(CART_KEY, cart);
-  }, [cart]);
+    if (session) write(cartKeyFor(session.id), cart);
+  }, [cart, session]);
 
   /* 참여 횟수가 늘어나도 같은 자리에서 저장된다 */
   useEffect(() => {
@@ -1548,20 +1545,71 @@ export default function App() {
     else drop(SESSION_KEY);
   }, [session]);
 
+  /* ── 브라우저 히스토리 ──
+     화면 전환을 히스토리에 남겨 뒤로/앞으로 가기(마우스 옆 버튼 포함)가 동작하게 한다. */
+  useEffect(() => {
+    window.history.replaceState({ view: { name: "list" } }, "");
+    function onPop(e: PopStateEvent) {
+      const saved = (e.state as { view?: View } | null)?.view;
+      setView(saved ?? { name: "list" });
+      window.scrollTo({ top: 0 });
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  /* 같은 화면으로의 이동은 히스토리에 쌓지 않는다 — 뒤로 가기를 여러 번 눌러야 하는 것을 막는다 */
+  function sameView(a: View, b: View) {
+    if (a.name !== b.name) return false;
+    if (a.name === "detail" && b.name === "detail") return a.id === b.id;
+    return true;
+  }
+
+  function navigate(next: View, replace = false) {
+    if (!sameView(view, next)) {
+      if (replace) window.history.replaceState({ view: next }, "");
+      else window.history.pushState({ view: next }, "");
+    }
+    setView(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  /* 로고 클릭 — 목록으로 돌아가면서 카테고리·서브카테고리도 처음 상태로 되돌린다 */
+  function goHome() {
+    setActiveNav("Guns");
+    setActiveSub("전체");
+    setMenuOpen(false);
+    navigate({ name: "list" });
+  }
+
   function handleLogin(id: string, plays: number, remember: boolean) {
     setSession({ id, plays, usedCodes: [], remember });
     setActiveCodeTab(tierFor(plays));
     setShowLogin(false);
 
-    if (afterLogin === "checkout") {
-      setAfterLogin(null);
-      setView({ name: "checkout" });
+    /* 이 계정이 지난번에 담아둔 장바구니를 되살린다 */
+    setCart(read<CartLine[]>(cartKeyFor(id), []));
+
+    /* 로그인 직전에 막혔던 동작을 이어서 실행한다.
+       이 시점에는 session 이 아직 갱신 전이라 로그인 검사를 다시 하지 않는다. */
+    const pending = afterLogin;
+    setAfterLogin(null);
+    if (!pending) return;
+
+    if (pending.kind === "checkout") {
+      navigate({ name: "checkout" });
+      return;
     }
+    putInCart(pending.id, pending.qty);
+    if (pending.kind === "buy") navigate({ name: "checkout" });
   }
 
   function handleLogout() {
     setSession(null);
     setActiveCodeTab("red");
+    /* 화면에서만 비운다. 저장된 장바구니는 다음 로그인 때 돌아온다 */
+    setCart([]);
+    navigate({ name: "list" });
   }
 
   /* 참여 코드 등록 — 승급하면 해당 등급 탭으로 옮겨 준다 */
@@ -1576,7 +1624,7 @@ export default function App() {
     setActiveNav(cat);
     setActiveSub("전체");
     setMenuOpen(false);
-    setView({ name: "list" });
+    navigate({ name: "list" });
   }
 
   /* ── 장바구니 ── */
@@ -1589,12 +1637,23 @@ export default function App() {
 
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0);
 
-  function addToCart(id: string, qty: number) {
+  function putInCart(id: string, qty: number) {
     setCart((prev) => {
       const found = prev.find((l) => l.id === id);
       if (found) return prev.map((l) => (l.id === id ? { ...l, qty: Math.min(99, l.qty + qty) } : l));
       return [...prev, { id, qty }];
     });
+  }
+
+  /* 담겼으면 true. 로그인이 필요하면 로그인 모달을 띄우고 false */
+  function addToCart(id: string, qty: number): boolean {
+    if (!userTier) {
+      setAfterLogin({ kind: "add", id, qty });
+      setShowLogin(true);
+      return false;
+    }
+    putInCart(id, qty);
+    return true;
   }
 
   function setQty(id: string, qty: number) {
@@ -1605,31 +1664,30 @@ export default function App() {
     setCart((prev) => prev.filter((l) => l.id !== id));
   }
 
-  /* 결제는 로그인이 필요하다 */
   function goCheckout() {
     if (cartLines.length === 0) return;
     if (!userTier) {
-      setAfterLogin("checkout");
+      setAfterLogin({ kind: "checkout" });
       setShowLogin(true);
       return;
     }
-    setView({ name: "checkout" });
+    navigate({ name: "checkout" });
   }
 
   function buyNow(id: string, qty: number) {
-    addToCart(id, qty);
     if (!userTier) {
-      setAfterLogin("checkout");
+      setAfterLogin({ kind: "buy", id, qty });
       setShowLogin(true);
       return;
     }
-    setView({ name: "checkout" });
+    putInCart(id, qty);
+    navigate({ name: "checkout" });
   }
 
   function finishOrder(orderNo: string, total: number) {
     setCart([]);
-    setView({ name: "done", orderNo, total });
-    window.scrollTo({ top: 0 });
+    /* 주문서를 완료 화면으로 대체한다 — 뒤로 가기로 비워진 주문서에 돌아가지 않도록 */
+    navigate({ name: "done", orderNo, total }, true);
   }
 
   /* filter products: category + sub + code tab tier */
@@ -1663,7 +1721,7 @@ export default function App() {
         <div className="max-w-[1280px] mx-auto px-4 md:px-8">
           <div className="flex items-center justify-between h-14">
             {/* Logo */}
-            <button className="flex items-center gap-3" onClick={() => setView({ name: "list" })}>
+            <button className="flex items-center gap-3" onClick={goHome}>
               <div className="w-7 h-7 flex items-center justify-center text-[10px] font-black"
                 style={{ background: C.red, color: "#fff", fontFamily: "Cinzel, serif" }}>
                 MH
@@ -1714,7 +1772,7 @@ export default function App() {
 
               {/* cart */}
               <button
-                onClick={() => setView({ name: "cart" })}
+                onClick={() => navigate({ name: "cart" })}
                 className="relative flex items-center justify-center transition-all"
                 style={{ width: 34, height: 30, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
                 aria-label="장바구니"
@@ -1939,7 +1997,7 @@ export default function App() {
                 {filtered.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {filtered.map((p) => (
-                      <ProductCard key={p.id} p={p} onOpen={() => setView({ name: "detail", id: p.id })} />
+                      <ProductCard key={p.id} p={p} onOpen={() => navigate({ name: "detail", id: p.id })} />
                     ))}
                   </div>
                 ) : (
@@ -1974,7 +2032,7 @@ export default function App() {
       {view.name === "detail" && detailProduct && (
         <ProductDetail
           p={detailProduct}
-          onBack={() => setView({ name: "list" })}
+          onBack={() => navigate({ name: "list" })}
           onAddToCart={(qty) => addToCart(detailProduct.id, qty)}
           onBuyNow={(qty) => buyNow(detailProduct.id, qty)}
         />
@@ -1985,7 +2043,7 @@ export default function App() {
           lines={cartLines}
           onQty={setQty}
           onRemove={removeLine}
-          onContinue={() => setView({ name: "list" })}
+          onContinue={() => navigate({ name: "list" })}
           onCheckout={goCheckout}
         />
       )}
@@ -1994,13 +2052,13 @@ export default function App() {
         <CheckoutView
           lines={cartLines}
           userTier={userTier}
-          onBack={() => setView({ name: "cart" })}
+          onBack={() => navigate({ name: "cart" })}
           onDone={finishOrder}
         />
       )}
 
       {view.name === "done" && (
-        <OrderDone orderNo={view.orderNo} total={view.total} onHome={() => setView({ name: "list" })} />
+        <OrderDone orderNo={view.orderNo} total={view.total} onHome={() => navigate({ name: "list" })} />
       )}
 
       {/* ── FOOTER ──────────────────────────────────── */}
