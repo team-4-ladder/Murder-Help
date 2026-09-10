@@ -9,8 +9,6 @@ import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
 import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
 import org.example.murderhelp.domain.chat.repository.ChatMessageRepository;
-import org.example.murderhelp.global.error.BusinessException;
-import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
