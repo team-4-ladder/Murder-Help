@@ -21,7 +21,6 @@ public class ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomService chatRoomService;
-    private final ChatRedisPublisher chatRedisPublisher;
 
     @Transactional
     public void sendMessage(ChatMessageSendRequest request) {

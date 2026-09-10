@@ -28,7 +28,7 @@ public class ChatRoomService {
     @Transactional
     public ChatRoomResponse createRoom(ChatRoomCreateRequest request) {
         boolean hasActiveRoom = chatRoomRepository.existsByCustomerIdAndStatusIn(
-                request.customerId(), 
+                request.customerId(),
                 List.of(ChatRoomStatus.WAITING, ChatRoomStatus.IN_PROGRESS)
         );
 
