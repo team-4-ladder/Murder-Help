@@ -3,7 +3,9 @@ package org.example.murderhelp.domain.product.dto;
 import org.example.murderhelp.domain.product.entity.Product;
 import org.example.murderhelp.domain.product.entity.ProductStatus;
 
-public record ProductResponse(
+import java.util.List;
+
+public record ProductDetailResponse(
         Long id,
         String productCode,
         String name,
@@ -11,13 +13,15 @@ public record ProductResponse(
         String category,
         String subCategory,
         long price,
+        int stockQuantity,
         String tier,
         String imageUrl,
-        ProductStatus status
+        ProductStatus status,
+        List<ProductSpecResponse> specs
 ) {
 
-    public static ProductResponse from(Product product) {
-        return new ProductResponse(
+    public static ProductDetailResponse from(Product product) {
+        return new ProductDetailResponse(
                 product.getId(),
                 product.getProductCode(),
                 product.getName(),
@@ -25,9 +29,13 @@ public record ProductResponse(
                 product.getCategory().getParent().getName(),
                 product.getCategory().getName(),
                 product.getPrice(),
+                product.getStockQuantity(),
                 product.getTier().getValue(),
                 product.getImageUrl(),
-                product.getStatus()
+                product.getStatus(),
+                product.getSpecs().stream()
+                        .map(ProductSpecResponse::from)
+                        .toList()
         );
     }
 }
