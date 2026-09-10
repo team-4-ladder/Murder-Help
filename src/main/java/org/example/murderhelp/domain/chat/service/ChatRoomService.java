@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,15 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomResponse createRoom(ChatRoomCreateRequest request) {
+        boolean hasActiveRoom = chatRoomRepository.existsByCustomerIdAndStatusIn(
+                request.customerId(), 
+                List.of(ChatRoomStatus.WAITING, ChatRoomStatus.IN_PROGRESS)
+        );
+
+        if (hasActiveRoom) {
+            throw new BusinessException(ErrorCode.ALREADY_ACTIVE_ROOM_EXISTS);
+        }
+
         String generatedTitle = "회원 " + request.customerId() + "님의 문의 (" + LocalDate.now() + ")";
 
         ChatRoom room = ChatRoom.builder()
