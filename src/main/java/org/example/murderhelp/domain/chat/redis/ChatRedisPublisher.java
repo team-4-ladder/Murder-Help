@@ -16,4 +16,10 @@ public class ChatRedisPublisher {
         String topic = "chat-room:" + roomId;
         redisTemplate.convertAndSend(topic, message);
     }
+
+    // 관리자 토픽으로 채팅방 상태/생성 이벤트 발행
+    public void publishRoomUpdate(org.example.murderhelp.domain.chat.dto.ChatRoomResponse response) {
+        String topic = "chat-room:updates";
+        redisTemplate.convertAndSend(topic, response);
+    }
 }

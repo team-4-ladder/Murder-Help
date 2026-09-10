@@ -3,8 +3,10 @@ package org.example.murderhelp.domain.chat.service;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
 import org.example.murderhelp.domain.chat.dto.ChatMessageSendRequest;
+import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 import org.example.murderhelp.domain.chat.entity.ChatMessage;
 import org.example.murderhelp.domain.chat.entity.ChatRoom;
+import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
 import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
 import org.example.murderhelp.domain.chat.repository.ChatMessageRepository;
 import org.example.murderhelp.global.error.BusinessException;
@@ -29,6 +31,14 @@ public class ChatMessageService {
         ChatRoom room = chatRoomService.getRoomEntity(request.roomId());
 
         room.getStatus().validateMessageSendable();
+
+        // 관리자(고객 본인이 아닌 사람)가 WAITING 상태의 방에 첫 답변을 보낼 때만 IN_PROGRESS로 전환
+        boolean isCustomer = room.getCustomerId().equals(request.memberId());
+        if (!isCustomer && room.getStatus() == ChatRoomStatus.WAITING && room.getAdminId() == null) {
+            room.assignAdmin(request.memberId());
+            // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
+            chatRedisPublisher.publishRoomUpdate(ChatRoomResponse.from(room));
+        }
 
         ChatMessage message = ChatMessage.builder()
                 .chatRoom(room)

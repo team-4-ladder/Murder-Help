@@ -5,12 +5,12 @@ import org.example.murderhelp.domain.chat.dto.ChatRoomCreateRequest;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
+import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
 import org.example.murderhelp.domain.chat.repository.ChatRoomRepository;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +23,7 @@ import java.util.List;
 public class ChatRoomService {
 
     private final ChatRoomRepository chatRoomRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatRedisPublisher chatRedisPublisher;
 
     @Transactional
     public ChatRoomResponse createRoom(ChatRoomCreateRequest request) {
@@ -44,7 +44,12 @@ public class ChatRoomService {
                 .build();
         
         chatRoomRepository.save(room);
-        return ChatRoomResponse.from(room);
+        ChatRoomResponse response = ChatRoomResponse.from(room);
+
+        // Redis Pub/Sub을 통해 관리자 대시보드로 브로드캐스트
+        chatRedisPublisher.publishRoomUpdate(response);
+
+        return response;
     }
 
     public Page<ChatRoomResponse> getRooms(Long customerId, ChatRoomStatus status, Pageable pageable) {
@@ -72,9 +77,9 @@ public class ChatRoomService {
         ChatRoom room = getRoomEntity(roomId);
         room.closeRoom(); 
         
-        messagingTemplate.convertAndSend(
-                "/sub/chat/room/" + roomId, 
-                "상담이 종료되었습니다."
-        );
+        ChatRoomResponse response = ChatRoomResponse.from(room);
+
+        // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
+        chatRedisPublisher.publishRoomUpdate(response);
     }
 }
