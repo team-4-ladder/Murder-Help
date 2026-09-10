@@ -7,6 +7,8 @@ import org.example.murderhelp.domain.order.entity.Order;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.repository.OrderItemRepository;
 import org.example.murderhelp.domain.order.repository.OrderRepository;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,15 @@ public class OrderService {
 
             return OrderResponse.from(order, items);
         });
+    }
+
+    public OrderResponse getOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        List<OrderItem> orderItemList = orderItemRepository.findAllByOrder_Id(orderId);
+
+        return OrderResponse.from(order, orderItemList.stream().map(OrderResponse.Item::from).toList());
     }
 
 }

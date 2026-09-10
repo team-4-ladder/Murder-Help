@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +32,13 @@ public class OrderController {
             ) Pageable pageable
     ) {
         return ApiResponse.ok(orderService.getOrderList(orderListRequest, pageable));
+    }
+
+    @GetMapping("/{orderId}")
+    public ApiResponse<OrderResponse> getOrder(
+            @PathVariable Long orderId
+    ) {
+        return ApiResponse.ok(orderService.getOrder(orderId));
     }
 
 }
