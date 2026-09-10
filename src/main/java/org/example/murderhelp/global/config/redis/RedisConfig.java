@@ -1,6 +1,5 @@
 package org.example.murderhelp.global.config.redis;
 
-import org.example.murderhelp.domain.chat.redis.ChatRedisSubscriber;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -11,6 +10,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+
 
 @Configuration
 public class RedisConfig {
@@ -50,15 +50,15 @@ public class RedisConfig {
     @Bean
     @Profile("!test")
     public RedisMessageListenerContainer redisMessageListenerContainer(
-            RedisConnectionFactory connectionFactory, 
+            RedisConnectionFactory connectionFactory,
             ChatRedisSubscriber subscriber) {
-        
+
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        
+
         // 채팅방 토픽 패턴(chat-room:*) 구독 등록
         container.addMessageListener(subscriber, new PatternTopic("chat-room:*"));
-        
+
         return container;
     }
 }

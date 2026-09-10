@@ -21,6 +21,7 @@ public class ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomService chatRoomService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public void sendMessage(ChatMessageSendRequest request) {
