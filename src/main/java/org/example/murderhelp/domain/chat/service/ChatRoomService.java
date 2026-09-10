@@ -1,0 +1,70 @@
+package org.example.murderhelp.domain.chat.service;
+
+import lombok.RequiredArgsConstructor;
+import org.example.murderhelp.domain.chat.dto.ChatRoomCreateRequest;
+import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
+import org.example.murderhelp.domain.chat.entity.ChatRoom;
+import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
+import org.example.murderhelp.domain.chat.repository.ChatRoomRepository;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ChatRoomService {
+
+    private final ChatRoomRepository chatRoomRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @Transactional
+    public ChatRoomResponse createRoom(ChatRoomCreateRequest request) {
+        String generatedTitle = "회원 " + request.customerId() + "님의 문의 (" + LocalDate.now() + ")";
+
+        ChatRoom room = ChatRoom.builder()
+                .title(generatedTitle)
+                .customerId(request.customerId())
+                .build();
+        
+        chatRoomRepository.save(room);
+        return ChatRoomResponse.from(room);
+    }
+
+    public Page<ChatRoomResponse> getRooms(Long customerId, ChatRoomStatus status, Pageable pageable) {
+        return chatRoomRepository.findRoomsByCondition(customerId, status, pageable)
+                .map(ChatRoomResponse::from);
+    }
+
+    public ChatRoomResponse getRoom(Long roomId) {
+        return ChatRoomResponse.from(getRoomEntity(roomId));
+    }
+
+    // 서비스 간 내부 호출용 엔티티 반환 메서드
+    public ChatRoom getRoomEntity(Long roomId) {
+        return chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    @Transactional
+    public void updateLastMessageTime(Long roomId) {
+        chatRoomRepository.updateLastMessageTime(roomId);
+    }
+
+    @Transactional
+    public void closeRoom(Long roomId) {
+        ChatRoom room = getRoomEntity(roomId);
+        room.closeRoom(); 
+        
+        messagingTemplate.convertAndSend(
+                "/sub/chat/room/" + roomId, 
+                "상담이 종료되었습니다."
+        );
+    }
+}
