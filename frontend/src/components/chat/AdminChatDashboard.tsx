@@ -10,14 +10,23 @@ export default function AdminChatDashboard() {
   const ADMIN_ID = 999999; // 덤프 관리자 ID
   const stompClient = useRef<Client | null>(null);
 
+  const [isError, setIsError] = useState(false);
+
   useEffect(() => {
     // 1. 최초 1회만 REST로 기존 채팅방 목록 조회
     fetch(`/api/chat/rooms?page=0&size=100`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("방 목록 조회 실패");
+        return res.json();
+      })
       .then(json => {
         if (json.data && json.data.content) {
           setRooms(json.data.content);
         }
+      })
+      .catch(err => {
+        console.warn("방 목록 조회 에러:", err);
+        setIsError(true);
       });
 
     // 2. STOMP 구독으로 새 채팅방/상태 변경을 실시간 수신
@@ -54,10 +63,15 @@ export default function AdminChatDashboard() {
       {/* 왼쪽: 채팅방 리스트 */}
       <div className="w-1/3 border-r border-[#333] flex flex-col bg-[#050505]">
         <div className="p-4 border-b border-[#333] bg-[#111]">
-          <h2 className="text-lg font-bold text-[#10b981] font-mono tracking-widest">HQ COMMS</h2>
+          <h2 className="text-lg font-bold text-[#10b981] font-mono tracking-widest">SUPPORT DESK</h2>
           <p className="text-xs text-gray-500 mt-1">Total Active Signals: {rooms.filter(r => r.status !== 'COMPLETED').length}</p>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {isError && (
+            <div className="p-4 text-center text-[#ff4422] text-xs font-mono bg-[#2a0804] border-b border-[#5a1005] leading-relaxed">
+              Failed to intercept communications.<br />System offline.
+            </div>
+          )}
           {rooms.map(room => (
             <div 
               key={room.roomId}
@@ -91,8 +105,15 @@ export default function AdminChatDashboard() {
               <h3 className="font-bold text-[#10b981] font-mono">SECURE CHANNEL #{selectedRoomId}</h3>
               <button 
                 onClick={() => {
-                  fetch(`/api/chat/rooms/${selectedRoomId}/close`, { method: "PATCH" });
-                  setSelectedRoomId(null);
+                  fetch(`/api/chat/rooms/${selectedRoomId}/close`, { method: "PATCH" })
+                    .then(res => {
+                      if (!res.ok) throw new Error("채널 닫기 실패");
+                      setSelectedRoomId(null);
+                    })
+                    .catch(err => {
+                      console.error(err);
+                      alert("채널을 종료하는 중 오류가 발생했습니다.");
+                    });
                 }}
                 className="text-xs bg-[#222] px-3 py-1.5 rounded hover:bg-[#333] transition-colors"
               >

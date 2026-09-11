@@ -10,6 +10,7 @@ export default function ChatRoomView({ roomId, customerId }: { roomId: number; c
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isError, setIsError] = useState(false);
   
   const stompClient = useRef<Client | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -19,10 +20,14 @@ export default function ChatRoomView({ roomId, customerId }: { roomId: number; c
   useEffect(() => {
     // 1. 방 상태 확인 (COMPLETED 인지 체크)
     fetch(`/api/chat/rooms/${roomId}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("방 상태 조회 실패");
+        return res.json();
+      })
       .then(json => {
         if (json.data && json.data.status === "COMPLETED") setIsCompleted(true);
-      });
+      })
+      .catch(err => console.warn("방 상태 조회 실패:", err));
 
     // 2. 초기 데이터(page=0) 로드
     loadMoreMessages(0, true);
@@ -61,9 +66,12 @@ export default function ChatRoomView({ roomId, customerId }: { roomId: number; c
     if (isFetchingHistory.current) return;
     isFetchingHistory.current = true;
     setIsLoading(true);
+    setIsError(false);
 
     try {
       const res = await fetch(`/api/chat/rooms/${roomId}/messages?page=${pageToLoad}&size=20`);
+      if (!res.ok) throw new Error("메시지 내역 조회 실패");
+      
       const json = await res.json();
       
       if (json.data && json.data.content) {
@@ -79,6 +87,9 @@ export default function ChatRoomView({ roomId, customerId }: { roomId: number; c
         setIsLast(json.data.last);
         setPage(pageToLoad);
       }
+    } catch (error) {
+      console.warn("과거 메시지 로드 에러:", error);
+      setIsError(true);
     } finally {
       setIsLoading(false);
       isFetchingHistory.current = false;
@@ -155,6 +166,12 @@ export default function ChatRoomView({ roomId, customerId }: { roomId: number; c
         {isLoading && page > 0 && (
           <div className="text-center py-2 text-[#a08070] text-xs font-mono">
             Loading past communications...
+          </div>
+        )}
+        
+        {isError && (
+          <div className="text-center py-3 my-2 text-xs font-mono rounded" style={{ background: "rgba(204,34,0,0.1)", border: "1px solid rgba(204,34,0,0.3)", color: "#e83010" }}>
+            통신이 불안정하여 일부 대화 기록을 불러오지 못했습니다.
           </div>
         )}
 
