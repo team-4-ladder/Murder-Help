@@ -1,5 +1,6 @@
 HELP.md
 .gradle
+.gradle-user/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -38,3 +39,11 @@ out/
 
 ### Local only ###
 CLAUDE.md
+
+
+### OS ###
+.DS_Store
+
+### Frontend ###
+src/main/resources/static/
+/AGENTS.md

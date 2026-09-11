@@ -21,6 +21,11 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     defer-datasource-initialization: true
 
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
   sql:
     init:
       mode: never
@@ -30,6 +35,20 @@ spring:
     prefix: classpath:/templates/
     suffix: .html
 
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+
 server:
   port: 8080
 
@@ -38,3 +57,8 @@ jwt:
   secret: "c3BhcnRhLXBheW1lbnQtand0LXNlY3JldC1rZXktZm9yLWJvb3RjYW1wLTIwMjYtdmVyeS1sb25nLXNlY3JldA=="  # Base64 encoded
   access-expiration: 1800000  # 1시간 (ms)
   refresh-expiration: 1209600000    
+
+aws:
+  s3:
+    bucket: ${S3_BUCKET:murder-help-bucket}
+    prefix: local
