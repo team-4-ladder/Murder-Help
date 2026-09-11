@@ -4,7 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.cart.dto.CartItemAddRequest;
 import org.example.murderhelp.domain.cart.dto.CartItemDetailResponse;
-import org.example.murderhelp.domain.cart.dto.CartItemQuantityUpdateRequest;
+import org.example.murderhelp.domain.cart.dto.CartItemUpdateRequest;
 import org.example.murderhelp.domain.cart.dto.CartItemResponse;
 import org.example.murderhelp.domain.cart.service.CartService;
 import org.example.murderhelp.global.response.ApiResponse;
@@ -46,7 +46,7 @@ public class CartController {
     public ApiResponse<CartItemResponse> updateItemQuantity(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long cartItemId,
-            @Valid @RequestBody CartItemQuantityUpdateRequest request
+            @Valid @RequestBody CartItemUpdateRequest request
     ) {
         return ApiResponse.ok(cartService.updateItemQuantity(memberId, cartItemId, request));
     }

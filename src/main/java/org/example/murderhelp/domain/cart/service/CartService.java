@@ -3,7 +3,7 @@ package org.example.murderhelp.domain.cart.service;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.cart.dto.CartItemAddRequest;
 import org.example.murderhelp.domain.cart.dto.CartItemDetailResponse;
-import org.example.murderhelp.domain.cart.dto.CartItemQuantityUpdateRequest;
+import org.example.murderhelp.domain.cart.dto.CartItemUpdateRequest;
 import org.example.murderhelp.domain.cart.dto.CartItemResponse;
 import org.example.murderhelp.domain.cart.entity.CartItem;
 import org.example.murderhelp.domain.cart.repository.CartItemRepository;
@@ -58,7 +58,7 @@ public class CartService {
     public CartItemResponse updateItemQuantity(
             Long memberId,
             Long cartItemId,
-            CartItemQuantityUpdateRequest request
+            CartItemUpdateRequest request
     ) {
         CartItem cartItem = getOwnedItem(memberId, cartItemId);
         cartItem.changeQuantity(request.quantity());
