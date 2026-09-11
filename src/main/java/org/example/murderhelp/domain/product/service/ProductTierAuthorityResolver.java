@@ -11,6 +11,8 @@ import java.util.Comparator;
 @Component
 public class ProductTierAuthorityResolver {
 
+    private static final String ROLE_PREFIX = "ROLE_";
+
     public ProductTier resolve(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
@@ -28,8 +30,13 @@ public class ProductTierAuthorityResolver {
             return null;
         }
 
+        // "ROLE_YELLOW", "YELLOW" 둘 다 등급으로 인식한다
+        String tierName = authority.startsWith(ROLE_PREFIX)
+                ? authority.substring(ROLE_PREFIX.length())
+                : authority;
+
         try {
-            return ProductTier.valueOf(authority);
+            return ProductTier.valueOf(tierName);
         } catch (IllegalArgumentException exception) {
             return null;
         }
