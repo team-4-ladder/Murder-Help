@@ -3,6 +3,7 @@ import { fetchProductDetail, fetchProductList, searchProducts, PAGE_SIZE, type A
 import { NAV_ITEMS, SUBCATS, type Tier } from "./catalog";
 import { Gate } from "./components/auth/Gate";
 import { LoginModal } from "./components/auth/LoginModal";
+import { logout } from "./api/auth";
 import { CartView } from "./components/cart/CartView";
 import { FloatingChatWidget } from "./components/chat/FloatingChatWidget";
 import { Spinner } from "./components/common/Spinner";
@@ -287,12 +288,17 @@ export default function App() {
     if (pending.kind === "buy") navigate({ name: "checkout" });
   }
 
-  function handleLogout() {
-    setSession(null);
-    setActiveCodeTab("red");
-    /* 화면에서만 비운다. 저장된 장바구니는 다음 로그인 때 돌아온다 */
-    setCart([]);
-    navigate({ name: "list" });
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSession(null);
+      setActiveCodeTab("red");
+      setCart([]);
+      navigate({ name: "list" });
+    }
   }
 
   function changeNav(cat: string) {
