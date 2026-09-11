@@ -9,6 +9,7 @@ import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
 import org.example.murderhelp.domain.chat.service.ChatMessageService;
 import org.example.murderhelp.domain.chat.service.ChatRoomService;
 import org.example.murderhelp.global.response.ApiResponse;
+import org.example.murderhelp.domain.chat.facade.ChatFacade;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,12 @@ public class ChatRestController {
 
     private final ChatRoomService chatRoomService;
     private final ChatMessageService chatMessageService;
+    private final ChatFacade chatFacade;
 
     // 1단계: 채팅방 생성 (문의 시작)
     @PostMapping
     public ApiResponse<ChatRoomResponse> createRoom(@Valid @RequestBody ChatRoomCreateRequest request) {
-        return ApiResponse.ok(chatRoomService.createRoom(request));
+        return ApiResponse.ok(chatFacade.createRoomAndSendGreeting(request));
     }
 
     // 2단계: 전체/조건별 채팅방 목록 조회 (페이징 + 마지막 메시지 최신순 정렬)

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.murderhelp.global.entity.BaseTimeEntity;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 
 @Entity
 @Getter
@@ -36,7 +38,11 @@ public class ChatRoom extends BaseTimeEntity {
     public ChatRoom(String title, Long customerId) {
         this.title = title;
         this.customerId = customerId;
-        this.status = ChatRoomStatus.WAITING; // 기본값
+        this.status = ChatRoomStatus.BOT_MODE; // 기본값: 챗봇 모드
+    }
+
+    public void changeToWaiting() {
+        this.status = ChatRoomStatus.WAITING;
     }
 
     public void assignAdmin(Long adminId) {
@@ -45,6 +51,13 @@ public class ChatRoom extends BaseTimeEntity {
     }
 
     public void closeRoom() {
+        if (!this.status.canClose()) {
+            throw new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS);
+        }
         this.status = ChatRoomStatus.COMPLETED;
+    }
+
+    public boolean isCustomer(Long memberId) {
+        return this.customerId.equals(memberId);
     }
 }

@@ -100,31 +100,35 @@ export default function AdminChatDashboard() {
       {/* 오른쪽: 채팅 화면 */}
       <div className="flex-1 bg-[#0a0a0a] flex flex-col relative">
         {selectedRoomId ? (
-          <>
-            <div className="p-4 border-b border-[#333] flex justify-between items-center bg-[#111] z-10">
-              <h3 className="font-bold text-[#10b981] font-mono">SECURE CHANNEL #{selectedRoomId}</h3>
-              <button 
-                onClick={() => {
-                  fetch(`/api/chat/rooms/${selectedRoomId}/close`, { method: "PATCH" })
-                    .then(res => {
-                      if (!res.ok) throw new Error("채널 닫기 실패");
-                      setSelectedRoomId(null);
-                    })
-                    .catch(err => {
-                      console.error(err);
-                      alert("채널을 종료하는 중 오류가 발생했습니다.");
-                    });
-                }}
-                className="text-xs bg-[#222] px-3 py-1.5 rounded hover:bg-[#333] transition-colors"
-              >
-                Close Channel
-              </button>
-            </div>
-            {/* ChatRoomView 재사용 (adminId 전달) */}
-            <div className="flex-1 relative overflow-hidden">
-              <ChatRoomView roomId={selectedRoomId} customerId={ADMIN_ID} />
-            </div>
-          </>
+          (() => {
+            const selectedRoom = rooms.find(r => r.roomId === selectedRoomId);
+            const isCompleted = selectedRoom?.status === 'COMPLETED';
+            return (
+              <>
+                <div className="p-4 border-b border-[#333] flex justify-between items-center bg-[#111] z-10">
+                  <h3 className="font-bold text-[#10b981] font-mono">SECURE CHANNEL #{selectedRoomId}</h3>
+                  {!isCompleted && (
+                    <button 
+                      onClick={() => {
+                        fetch(`/api/chat/rooms/${selectedRoomId}/close`, { method: "PATCH" })
+                          .then(res => {
+                            if (!res.ok) throw new Error("채널 닫기 실패");
+                            setSelectedRoomId(null);
+                          })
+                          .catch(err => alert(err.message));
+                      }}
+                      className="px-4 py-2 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 rounded-md transition-colors font-mono tracking-widest text-xs"
+                    >
+                      CLOSE CHANNEL
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1 relative overflow-hidden">
+                  <ChatRoomView roomId={selectedRoomId} customerId={ADMIN_ID} isAdmin={true} />
+                </div>
+              </>
+            );
+          })()
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 opacity-50">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4">

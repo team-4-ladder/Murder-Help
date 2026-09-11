@@ -1,8 +1,11 @@
 package org.example.murderhelp.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
 import org.example.murderhelp.domain.chat.dto.ChatRoomCreateRequest;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
+import org.example.murderhelp.domain.chat.entity.ChatMessage;
+import org.example.murderhelp.domain.chat.entity.ChatMessageType;
 import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
 import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
@@ -13,9 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +38,8 @@ public class ChatRoomService {
             throw new BusinessException(ErrorCode.ALREADY_ACTIVE_ROOM_EXISTS);
         }
 
-        String generatedTitle = "회원 " + request.customerId() + "님의 문의 (" + LocalDate.now() + ")";
+        String randomHash = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        String generatedTitle = String.format("REQ-CUST%03d-%s", request.customerId(), randomHash);
 
         ChatRoom room = ChatRoom.builder()
                 .title(generatedTitle)
@@ -45,7 +48,6 @@ public class ChatRoomService {
         
         chatRoomRepository.save(room);
         ChatRoomResponse response = ChatRoomResponse.from(room);
-
         // Redis Pub/Sub을 통해 관리자 대시보드로 브로드캐스트
         chatRedisPublisher.publishRoomUpdate(response);
 
@@ -81,5 +83,14 @@ public class ChatRoomService {
 
         // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
         chatRedisPublisher.publishRoomUpdate(response);
+        
+        // 채팅방 내부로도 종료 알림 시스템 메시지 발송 (프론트엔드 상태 잠금용)
+        ChatMessage closeMsg =  ChatMessage.builder()
+                .chatRoom(room)
+                .memberId(0L)
+                .content("[CLOSED] 상담이 완전히 종료되었습니다.")
+                .messageType(ChatMessageType.SYSTEM)
+                .build();
+        chatRedisPublisher.publish(roomId, ChatMessageResponse.from(closeMsg));
     }
 }

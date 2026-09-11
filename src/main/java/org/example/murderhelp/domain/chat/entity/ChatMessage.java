@@ -28,10 +28,15 @@ public class ChatMessage extends BaseTimeEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", nullable = false, length = 20)
+    private ChatMessageType messageType;
+
     @Builder
-    public ChatMessage(ChatRoom chatRoom, Long memberId, String content) {
+    public ChatMessage(ChatRoom chatRoom, Long memberId, String content, ChatMessageType messageType) {
         this.chatRoom = chatRoom;
         this.memberId = memberId;
         this.content = content;
+        this.messageType = messageType != null ? messageType : ChatMessageType.TEXT;
     }
 }
