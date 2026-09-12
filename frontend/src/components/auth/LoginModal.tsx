@@ -2,10 +2,11 @@ import { useState, type FormEvent } from "react";
 import { login, signup, type Member } from "../../api/auth";
 import { C } from "../../lib/theme";
 import { Spinner } from "../common/Spinner";
+import type { Tier } from "../../catalog";
 
 type LoginModalProps = {
   // 기존 App.tsx의 handleLogin(id, spent)과 호환되도록 유지
-  onLogin: (id: string, spent: number) => void;
+  onLogin: (id: string, spent: number, grade?: Tier) => void;
   onClose: () => void;
 };
 
@@ -50,7 +51,7 @@ export function LoginModal({ onLogin, onClose }: LoginModalProps) {
   }
 
   function completeLogin(member: Member) {
-    onLogin(String(member.id), spentFromGrade(member.grade));
+    onLogin(String(member.id), spentFromGrade(member.grade), member.grade.toLowerCase() as Tier);
   }
 
   async function handleLogin(event: FormEvent) {
