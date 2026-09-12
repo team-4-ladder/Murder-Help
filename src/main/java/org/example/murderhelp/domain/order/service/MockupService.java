@@ -14,7 +14,6 @@ import java.util.List;
 @Service
 public class MockupService {
 
-    public static final Long USER_ID = 1L;
     private final ProductRepository productRepository;
 
     public MockupService(ProductRepository productRepository) {

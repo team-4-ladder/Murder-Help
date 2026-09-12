@@ -26,10 +26,10 @@ public class OrderFacade {
     private final ProductService productService;
 
     @Transactional
-    public CreateOrderResponse createOrder(CreateOrderRequest createOrderRequest) {
+    public CreateOrderResponse createOrder(Long memberId, CreateOrderRequest createOrderRequest) {
         // 요청 정보 및 주문 가능 여부 검증
         List<CartItemResponse> cartItemList = mockupService.getCartList(
-                MockupService.USER_ID,
+                memberId,
                 createOrderRequest.cartItemIds()
         );
         if (cartItemList.size() != createOrderRequest.cartItemIds().size()) {
@@ -48,7 +48,7 @@ public class OrderFacade {
 
         // 주문 저장
         CreateOrderResponse createOrderResponse = orderService.createOrder(
-                MockupService.USER_ID,
+                memberId,
                 createOrderRequest,
                 cartItemList,
                 productMap

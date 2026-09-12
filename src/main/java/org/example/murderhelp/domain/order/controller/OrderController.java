@@ -52,9 +52,10 @@ public class OrderController {
 
     @PostMapping
     public ApiResponse<CreateOrderResponse> createOrder(
+            @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody CreateOrderRequest createOrderRequest
     ) {
-        return ApiResponse.ok(orderFacade.createOrder(createOrderRequest));
+        return ApiResponse.ok(orderFacade.createOrder(memberId, createOrderRequest));
     }
 
 }
