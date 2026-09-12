@@ -61,6 +61,21 @@ export function useChatRoom(roomId: number) {
              }
           }, 50);
         });
+
+        // 실시간 방 상태 업데이트 구독 (상담사 연결 등으로 상태가 변경될 때 즉각 반영)
+        client.subscribe('/sub/chat/rooms/updates', (msg) => {
+          try {
+            const updatedRoom = JSON.parse(msg.body);
+            if (updatedRoom.roomId === roomId) {
+              setStatus(updatedRoom.status);
+              if (updatedRoom.status === "COMPLETED") {
+                setIsCompleted(true);
+              }
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        });
       }
     });
 
