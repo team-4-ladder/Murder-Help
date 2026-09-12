@@ -4,19 +4,21 @@ import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.payment.entity.Payment;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-//import org.example.murderhelp.domain.order.entity.QOrder;
-//import org.example.murderhelp.domain.order.entity.QOrderItem;
-//import org.example.murderhelp.domain.payment.entity.QPayment;
+import org.example.murderhelp.domain.order.entity.QOrder;
+import org.example.murderhelp.domain.order.entity.QOrderItem;
+import org.example.murderhelp.domain.payment.entity.QPayment;
+import org.example.murderhelp.domain.payment.repository.dto.PaymentWithItems;
 
 @RequiredArgsConstructor
 public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
-/*
+
     private final JPAQueryFactory queryFactory;
 
     private final QOrder order = QOrder.order;
@@ -84,14 +86,23 @@ public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
 
     // 결제 상세 조회 - paymentId 기준 (Order, OrderItems fetch join)
     @Override
-    public Optional<Payment> findByIdWithOrderAndItems(Long paymentId) {
+    public Optional<PaymentWithItems> findByIdWithOrderAndItems(Long paymentId) {
         Payment result = queryFactory
                 .selectFrom(payment)
                 .join(payment.order, order).fetchJoin()
-                .join(order.orderItems, orderItem).fetchJoin()
                 .where(payment.id.eq(paymentId))
                 .fetchOne();
-        return Optional.ofNullable(result);
+
+        if (result == null) {
+            return Optional.empty();
+        }
+
+        List<OrderItem> items = queryFactory
+                .selectFrom(orderItem)
+                .where(orderItem.order.eq(result.getOrder()))
+                .fetch();
+
+        return Optional.of(new PaymentWithItems(result, items));
     }
 
     @Override
@@ -125,7 +136,6 @@ public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
         return Optional.ofNullable(result);
     }
 
-*/
 }
 
 

@@ -5,6 +5,7 @@ import org.example.murderhelp.domain.order.entity.Order;
 import org.example.murderhelp.domain.payment.entity.FailReason;
 import org.example.murderhelp.domain.payment.entity.Payment;
 import org.example.murderhelp.domain.payment.repository.PaymentRepository;
+import org.example.murderhelp.domain.payment.repository.dto.PaymentWithItems;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -45,12 +46,13 @@ public class PaymentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
-    public Payment findByIdWithOrderAndItems(Long paymentId) {
+    public PaymentWithItems findByIdWithOrderAndItems(Long paymentId) {
         return paymentRepository.findByIdWithOrderAndItems(paymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
-    public Payment findForRefund(Long paymentId) {
+    public PaymentWithItems findForRefund(Long paymentId) {
+
         // 1. Payment 단독 락 획득 (이중 환불 차단)
         paymentRepository.findByIdForRefundLockOnly(paymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
