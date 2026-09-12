@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useChatRoom } from "./useChatRoom";
 import { ChatMessageBubble } from "./ChatMessageBubble";
+import { getAccessToken } from "../../api/auth";
 
 export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { roomId: number; customerId: number; isAdmin?: boolean }) {
   const [input, setInput] = useState("");
@@ -9,6 +10,7 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
     messages,
     isLoading,
     isCompleted,
+    status,
     isError,
     showScrollBottom,
     containerRef,
@@ -17,9 +19,12 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
     sendMessage
   } = useChatRoom(roomId);
 
+  const isAdminBotMode = isAdmin && status === "BOT_MODE";
+  const isInputDisabled = isCompleted || isAdminBotMode;
+
   const send = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isCompleted) return;
+    if (!input.trim() || isInputDisabled) return;
     sendMessage(customerId, input);
     setInput("");
   };
@@ -39,7 +44,12 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
             <button 
               onClick={() => {
                 if (window.confirm("현재 통신을 완전히 종료하시겠습니까?")) {
-                  fetch(`/api/chat/rooms/${roomId}/close`, { method: "PATCH" });
+                  fetch(`/api/chat/rooms/${roomId}/close`, { 
+                    method: "PATCH",
+                    headers: {
+                      Authorization: `Bearer ${getAccessToken()}`
+                    }
+                  });
                 }
               }}
               className="text-xs font-bold px-4 py-2 rounded transition-colors uppercase tracking-widest border border-[#cc2200] text-[#ff4422] hover:bg-[#cc2200] hover:text-white"
@@ -69,6 +79,7 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
             customerId={customerId}
             isAdmin={isAdmin}
             isCompleted={isCompleted}
+            isLatest={idx === messages.length - 1}
             onSendBotOption={(label) => sendMessage(customerId, label)}
           />
         ))}
@@ -92,16 +103,20 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
           type="text" 
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={isCompleted}
-          placeholder={isCompleted ? "상담이 완전히 종료되었습니다." : "메시지 전송..."}
+          disabled={isInputDisabled}
+          placeholder={
+            isCompleted ? "상담이 완전히 종료되었습니다." 
+            : isAdminBotMode ? "봇 모드에서는 채팅을 입력할 수 없습니다."
+            : "메시지 전송..."
+          }
           className="flex-1 bg-black border rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#cc2200] transition-colors"
-          style={{ borderColor: "rgba(204,34,0,0.25)", opacity: isCompleted ? 0.5 : 1 }}
+          style={{ borderColor: "rgba(204,34,0,0.25)", opacity: isInputDisabled ? 0.5 : 1 }}
         />
         <button 
           type="submit" 
-          disabled={isCompleted || !input.trim()}
+          disabled={isInputDisabled || !input.trim()}
           className="px-4 py-2 font-bold rounded text-xs transition-colors hover:bg-[#e83010] disabled:hover:bg-[#333]"
-          style={{ background: isCompleted ? "#333" : "#cc2200", color: isCompleted ? "#888" : "#fff", fontFamily: "Share Tech Mono" }}
+          style={{ background: isInputDisabled ? "#333" : "#cc2200", color: isInputDisabled ? "#888" : "#fff", fontFamily: "Share Tech Mono" }}
         >
           SEND
         </button>

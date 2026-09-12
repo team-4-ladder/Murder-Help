@@ -3,6 +3,7 @@ import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import ChatRoomView from "./ChatRoomView";
 import type { ChatRoomResponse } from "./chat.types";
+import { getAccessToken } from "../../api/auth";
 
 export default function AdminChatDashboard() {
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);
@@ -14,7 +15,11 @@ export default function AdminChatDashboard() {
 
   useEffect(() => {
     // 1. 최초 1회만 REST로 기존 채팅방 목록 조회
-    fetch(`/api/chat/rooms?page=0&size=100`)
+    fetch(`/api/chat/rooms?page=0&size=100`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    })
       .then(res => {
         if (!res.ok) throw new Error("방 목록 조회 실패");
         return res.json();
@@ -32,6 +37,9 @@ export default function AdminChatDashboard() {
     // 2. STOMP 구독으로 새 채팅방/상태 변경을 실시간 수신
     const client = new Client({
       webSocketFactory: () => new SockJS("/ws"),
+      connectHeaders: {
+        Authorization: `Bearer ${getAccessToken()}`
+      },
       reconnectDelay: 5000,
       onConnect: () => {
         client.subscribe("/sub/chat/rooms/updates", (msg) => {
@@ -110,7 +118,12 @@ export default function AdminChatDashboard() {
                   {!isCompleted && (
                     <button 
                       onClick={() => {
-                        fetch(`/api/chat/rooms/${selectedRoomId}/close`, { method: "PATCH" })
+                        fetch(`/api/chat/rooms/${selectedRoomId}/close`, { 
+                          method: "PATCH",
+                          headers: {
+                            Authorization: `Bearer ${getAccessToken()}`
+                          }
+                        })
                           .then(res => {
                             if (!res.ok) throw new Error("채널 닫기 실패");
                             setSelectedRoomId(null);

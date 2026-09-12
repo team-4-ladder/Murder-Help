@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.murderhelp.global.entity.BaseTimeEntity;
+import org.example.murderhelp.domain.member.entity.Member;
 
 @Entity
 @Getter
@@ -21,9 +22,9 @@ public class ChatMessage extends BaseTimeEntity {
     @JoinColumn(name = "chat_room_id", nullable = false)
     private ChatRoom chatRoom;
 
-    // TODO: 인증/Member 도입 시 연관관계(ManyToOne 등) 매핑으로 변경 고려
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member sender;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
@@ -33,9 +34,9 @@ public class ChatMessage extends BaseTimeEntity {
     private ChatMessageType messageType;
 
     @Builder
-    public ChatMessage(ChatRoom chatRoom, Long memberId, String content, ChatMessageType messageType) {
+    public ChatMessage(ChatRoom chatRoom, Member sender, String content, ChatMessageType messageType) {
         this.chatRoom = chatRoom;
-        this.memberId = memberId;
+        this.sender = sender;
         this.content = content;
         this.messageType = messageType != null ? messageType : ChatMessageType.TEXT;
     }

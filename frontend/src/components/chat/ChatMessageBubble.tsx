@@ -5,12 +5,13 @@ interface ChatMessageBubbleProps {
   customerId: number;
   isAdmin: boolean;
   isCompleted: boolean;
+  isLatest?: boolean;
   onSendBotOption: (label: string) => void;
 }
 
-export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted, onSendBotOption }: ChatMessageBubbleProps) {
-  const isMe = m.memberId === customerId || (isAdmin && m.memberId === 0);
-  const isBot = m.memberId === 0;
+export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted, isLatest = false, onSendBotOption }: ChatMessageBubbleProps) {
+  const isMe = m.memberId === customerId;
+  const isBot = m.senderEmail === "bot@system.com";
   const isOtherAdmin = !isMe && !isBot && !isAdmin;
   const isOtherCustomer = !isMe && !isBot && isAdmin;
   
@@ -72,21 +73,6 @@ export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted
           <>
             <div className="whitespace-pre-wrap leading-relaxed">{botData.text}</div>
             
-            {botData.options && botData.options.length > 0 && (
-              <div className="mt-3 flex flex-col gap-2">
-                {botData.options.map((opt, oIdx) => (
-                  <button
-                    key={oIdx}
-                    onClick={() => handleOptionClick(opt.label)}
-                    className={`text-xs py-1.5 px-3 rounded border text-center transition-colors ${isAdmin ? "opacity-50 cursor-not-allowed" : "hover:bg-[#cc2200] hover:text-white"}`}
-                    style={{ borderColor: "rgba(204,34,0,0.7)", color: "#ff6644", background: "rgba(0,0,0,0.5)" }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {botData.products && botData.products.length > 0 && (
               <div className="mt-3 flex flex-col gap-2">
                 {botData.products.map((p, pIdx) => (
@@ -95,6 +81,25 @@ export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted
                     <span style={{ color: "#ff6644", fontFamily: "Share Tech Mono" }}>${p.price}</span>
                   </div>
                 ))}
+              </div>
+            )}
+            
+            {botData.options && botData.options.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2">
+                {botData.options.map((opt, oIdx) => {
+                  const isOptionDisabled = isAdmin || !isLatest;
+                  return (
+                    <button
+                      key={oIdx}
+                      disabled={isOptionDisabled}
+                      onClick={() => handleOptionClick(opt.label)}
+                      className={`text-xs py-1.5 px-3 rounded border text-center transition-colors ${isOptionDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-[#cc2200] hover:text-white"}`}
+                      style={{ borderColor: "rgba(204,34,0,0.7)", color: "#ff6644", background: "rgba(0,0,0,0.5)" }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </>

@@ -10,10 +10,13 @@ export interface ChatRoomResponse {
 export type ChatMessageType = "TEXT" | "SYSTEM" | "BUTTON";
 
 export interface ChatMessageResponse {
+  id: number;
   roomId: number;
   memberId: number;
+  senderEmail: string;
+  senderName: string;
   content: string;
-  messageType?: ChatMessageType;
+  messageType: "TEXT" | "SYSTEM" | "BUTTON";
   createdAt: string;
 }
 

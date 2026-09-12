@@ -2,7 +2,6 @@ package org.example.murderhelp.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
-import org.example.murderhelp.domain.chat.dto.ChatRoomCreateRequest;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 import org.example.murderhelp.domain.chat.entity.ChatMessage;
 import org.example.murderhelp.domain.chat.entity.ChatMessageType;
@@ -12,6 +11,8 @@ import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
 import org.example.murderhelp.domain.chat.repository.ChatRoomRepository;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
+import org.example.murderhelp.domain.member.entity.Member;
+import org.example.murderhelp.domain.member.service.MemberService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,11 +27,12 @@ public class ChatRoomService {
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRedisPublisher chatRedisPublisher;
+    private final MemberService memberService;
 
     @Transactional
-    public ChatRoomResponse createRoom(ChatRoomCreateRequest request) {
+    public ChatRoomResponse createRoom(Long memberId) {
         boolean hasActiveRoom = chatRoomRepository.existsByCustomerIdAndStatusIn(
-                request.customerId(),
+                memberId,
                 List.of(ChatRoomStatus.WAITING, ChatRoomStatus.IN_PROGRESS)
         );
 
@@ -38,12 +40,14 @@ public class ChatRoomService {
             throw new BusinessException(ErrorCode.ALREADY_ACTIVE_ROOM_EXISTS);
         }
 
+        Member customer = memberService.getMemberById(memberId);
+
         String randomHash = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
-        String generatedTitle = String.format("REQ-CUST%03d-%s", request.customerId(), randomHash);
+        String generatedTitle = String.format("REQ-CUST%03d-%s", memberId, randomHash);
 
         ChatRoom room = ChatRoom.builder()
                 .title(generatedTitle)
-                .customerId(request.customerId())
+                .customer(customer)
                 .build();
         
         chatRoomRepository.save(room);
@@ -83,14 +87,5 @@ public class ChatRoomService {
 
         // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
         chatRedisPublisher.publishRoomUpdate(response);
-        
-        // 채팅방 내부로도 종료 알림 시스템 메시지 발송 (프론트엔드 상태 잠금용)
-        ChatMessage closeMsg =  ChatMessage.builder()
-                .chatRoom(room)
-                .memberId(0L)
-                .content("[CLOSED] 상담이 완전히 종료되었습니다.")
-                .messageType(ChatMessageType.SYSTEM)
-                .build();
-        chatRedisPublisher.publish(roomId, ChatMessageResponse.from(closeMsg));
     }
 }

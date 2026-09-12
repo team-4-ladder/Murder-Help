@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.example.murderhelp.global.entity.BaseTimeEntity;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
+import org.example.murderhelp.domain.member.entity.Member;
 
 @Entity
 @Getter
@@ -22,22 +23,22 @@ public class ChatRoom extends BaseTimeEntity {
     @Column(nullable = false)
     private String title;
 
-    // TODO: 인증/Member 도입 시 연관관계(ManyToOne 등) 매핑으로 변경 고려
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
+    private Member customer;
 
-    // TODO: 인증/Member 도입 시 연관관계(ManyToOne 등) 매핑으로 변경 고려
-    @Column(name = "admin_id")
-    private Long adminId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "admin_id")
+    private Member admin;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ChatRoomStatus status;
 
     @Builder
-    public ChatRoom(String title, Long customerId) {
+    public ChatRoom(String title, Member customer) {
         this.title = title;
-        this.customerId = customerId;
+        this.customer = customer;
         this.status = ChatRoomStatus.BOT_MODE; // 기본값: 챗봇 모드
     }
 
@@ -45,8 +46,8 @@ public class ChatRoom extends BaseTimeEntity {
         this.status = ChatRoomStatus.WAITING;
     }
 
-    public void assignAdmin(Long adminId) {
-        this.adminId = adminId;
+    public void assignAdmin(Member admin) {
+        this.admin = admin;
         this.status = ChatRoomStatus.IN_PROGRESS;
     }
 
@@ -58,6 +59,6 @@ public class ChatRoom extends BaseTimeEntity {
     }
 
     public boolean isCustomer(Long memberId) {
-        return this.customerId.equals(memberId);
+        return this.customer.getId().equals(memberId);
     }
 }

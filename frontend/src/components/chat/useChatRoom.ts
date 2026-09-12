@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import type { ChatMessageResponse } from "./chat.types";
+import { getAccessToken } from "../../api/auth";
 
 export function useChatRoom(roomId: number) {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
@@ -9,6 +10,7 @@ export function useChatRoom(roomId: number) {
   const [isLast, setIsLast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [status, setStatus] = useState<string>("BOT_MODE");
   const [isError, setIsError] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
@@ -20,10 +22,15 @@ export function useChatRoom(roomId: number) {
 
   // 1. 초기 데이터 및 상태 조회, STOMP 연결
   useEffect(() => {
-    fetch(`/api/chat/rooms/${roomId}`)
+    fetch(`/api/chat/rooms/${roomId}`, {
+      headers: { Authorization: `Bearer ${getAccessToken()}` }
+    })
       .then(res => res.json())
       .then(json => {
-        if (json.data && json.data.status === "COMPLETED") setIsCompleted(true);
+        if (json.data) {
+          setStatus(json.data.status);
+          if (json.data.status === "COMPLETED") setIsCompleted(true);
+        }
       })
       .catch(err => console.warn("방 상태 조회 실패:", err));
 
@@ -31,6 +38,9 @@ export function useChatRoom(roomId: number) {
 
     const client = new Client({
       webSocketFactory: () => new SockJS("/ws"),
+      connectHeaders: {
+        Authorization: `Bearer ${getAccessToken()}`
+      },
       debug: (str) => console.log(str),
       reconnectDelay: 5000,
       onConnect: () => {
@@ -57,7 +67,9 @@ export function useChatRoom(roomId: number) {
     client.activate();
     stompClient.current = client;
 
-    return () => client.deactivate();
+    return () => { 
+      client.deactivate(); 
+    };
   }, [roomId]);
 
   // 2. 과거 메시지 로딩 함수
@@ -68,7 +80,9 @@ export function useChatRoom(roomId: number) {
     setIsError(false);
 
     try {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages?page=${pageToLoad}&size=20`);
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?page=${pageToLoad}&size=20`, {
+        headers: { Authorization: `Bearer ${getAccessToken()}` }
+      });
       if (!res.ok) throw new Error("메시지 내역 조회 실패");
       const json = await res.json();
       
@@ -139,6 +153,7 @@ export function useChatRoom(roomId: number) {
     messages,
     isLoading,
     isCompleted,
+    status,
     isError,
     showScrollBottom,
     containerRef,

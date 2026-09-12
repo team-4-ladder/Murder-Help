@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
+import org.example.murderhelp.domain.member.entity.Member;
+import org.example.murderhelp.domain.member.service.MemberService;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +30,7 @@ public class ChatMessageService {
     private final ChatRoomService chatRoomService;
     private final ChatRedisPublisher chatRedisPublisher;
     private final ObjectMapper objectMapper;
-
+    private final MemberService memberService;
 
     @Transactional
     public void sendBotWelcomeMessage(Long roomId) {
@@ -38,17 +40,33 @@ public class ChatMessageService {
         try {
             botMessageJson = objectMapper.writeValueAsString(BotScenario.WELCOME.getMessageDto());
         } catch (Exception e) {
-            throw new RuntimeException("봇 메시지 생성 실패", e);
+            throw new RuntimeException("봇 웰컴 메시지 생성 실패", e);
         }
         
         ChatMessage botMessage = ChatMessage.builder()
                 .chatRoom(room)
-                .memberId(0L)
+                .sender(memberService.getSystemBotMember())
                 .content(botMessageJson)
                 .messageType(ChatMessageType.BUTTON)
                 .build();
         
         chatMessageRepository.save(botMessage);
+        chatRedisPublisher.publish(room.getId(), ChatMessageResponse.from(botMessage));
+    }
+
+    @Transactional
+    public void sendCloseSystemMessage(Long roomId) {
+        ChatRoom room = chatRoomService.getRoomEntity(roomId);
+        
+        ChatMessage closeMsg = ChatMessage.builder()
+                .chatRoom(room)
+                .sender(memberService.getSystemBotMember())
+                .content("[CLOSED] 상담이 완전히 종료되었습니다.")
+                .messageType(ChatMessageType.SYSTEM)
+                .build();
+                
+        chatMessageRepository.save(closeMsg);
+        chatRedisPublisher.publish(room.getId(), ChatMessageResponse.from(closeMsg));
     }
 
     @Transactional
@@ -56,20 +74,22 @@ public class ChatMessageService {
 
         ChatRoom room = chatRoomService.getRoomEntity(request.roomId());
 
-        boolean isCustomer = room.isCustomer(request.memberId());
+        Member sender = memberService.getMemberById(request.memberId());
+
+        boolean isCustomer = room.isCustomer(sender.getId());
         
         if (!room.getStatus().canSendMessage(isCustomer)) {
             throw new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS);
         }
-        if (!isCustomer && room.getStatus() == ChatRoomStatus.WAITING && room.getAdminId() == null) {
-            room.assignAdmin(request.memberId());
+        if (!isCustomer && room.getStatus() == ChatRoomStatus.WAITING && room.getAdmin() == null) {
+            room.assignAdmin(sender);
             // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
             chatRedisPublisher.publishRoomUpdate(ChatRoomResponse.from(room));
         }
 
         ChatMessage message = ChatMessage.builder()
                 .chatRoom(room)
-                .memberId(request.memberId())
+                .sender(sender)
                 .content(request.content())
                 .messageType(request.messageType() != null ? request.messageType() : ChatMessageType.TEXT)
                 .build();
@@ -87,7 +107,7 @@ public class ChatMessageService {
                 
                 ChatMessage botMsg = ChatMessage.builder()
                     .chatRoom(room)
-                    .memberId(0L)
+                    .sender(memberService.getSystemBotMember())
                     .content("상담사 연결을 대기 중입니다. 잠시만 기다려주세요.")
                     .messageType(ChatMessageType.SYSTEM)
                     .build();
@@ -102,8 +122,23 @@ public class ChatMessageService {
                 }
                 ChatMessage botMsg = ChatMessage.builder()
                     .chatRoom(room)
-                    .memberId(0L)
+                    .sender(memberService.getSystemBotMember())
                     .content(recJson)
+                    .messageType(ChatMessageType.BUTTON)
+                    .build();
+                chatMessageRepository.save(botMsg);
+                chatRedisPublisher.publish(room.getId(), ChatMessageResponse.from(botMsg));
+            } else if ("처음으로 돌아가기".equals(request.content())) {
+                String welcomeJson;
+                try {
+                    welcomeJson = objectMapper.writeValueAsString(BotScenario.WELCOME.getMessageDto());
+                } catch (Exception e) {
+                    throw new RuntimeException("봇 메시지 생성 실패", e);
+                }
+                ChatMessage botMsg = ChatMessage.builder()
+                    .chatRoom(room)
+                    .sender(memberService.getSystemBotMember())
+                    .content(welcomeJson)
                     .messageType(ChatMessageType.BUTTON)
                     .build();
                 chatMessageRepository.save(botMsg);
@@ -117,7 +152,7 @@ public class ChatMessageService {
                 }
                 ChatMessage botMsg = ChatMessage.builder()
                     .chatRoom(room)
-                    .memberId(0L)
+                    .sender(memberService.getSystemBotMember())
                     .content(fallbackJson)
                     .messageType(ChatMessageType.BUTTON)
                     .build();

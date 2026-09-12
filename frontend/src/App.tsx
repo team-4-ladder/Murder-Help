@@ -43,6 +43,7 @@ import { canAccess, TIERS, tierFor } from "./lib/tier";
 type Session = {
   id: string;
   spent: number;
+  grade?: Tier;
 };
 
 /* ─── 주문 ───────────────────────────────────────────────── */
@@ -1266,7 +1267,7 @@ export default function App() {
   const [activeCodeTab, setActiveCodeTab] = useState<Tier>(() => {
     const saved = read<Session | null>(SESSION_KEY, null);
     if (!saved) return "red";
-    const tier = tierFor(saved.spent, saved.id);
+    const tier = saved.grade ?? tierFor(saved.spent, saved.id);
     return tier === "green" ? "red" : tier;
   });
 
@@ -1539,9 +1540,9 @@ export default function App() {
     navigate({ name: "cart" });
   }
 
-  function handleLogin(id: string, spent: number) {
-    setSession({ id, spent });
-    const tier = tierFor(spent, id);
+  function handleLogin(id: string, spent: number, grade?: Tier) {
+    setSession({ id, spent, grade });
+    const tier = grade ?? tierFor(spent, id);
     setActiveCodeTab(tier === "green" ? "red" : tier);
     setShowLogin(false);
 
@@ -2229,7 +2230,7 @@ export default function App() {
           </div>
         </div>
       </footer>
-      {session && <FloatingChatWidget customerId={1} isAdmin={userTier === "green"} />}
+      {session && <FloatingChatWidget customerId={Number(session.id)} isAdmin={userTier === "green"} />}
     </div>
   );
 }

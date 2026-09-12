@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChatRoomResponse } from "./chat.types";
+import { getAccessToken } from "../../api/auth";
 
 export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin }: { customerId: number; onSelectRoom: (id: number) => void; preventAutoJoin?: boolean }) {
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);
@@ -7,7 +8,11 @@ export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin
   const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/chat/rooms?customerId=${customerId}&page=0&size=50`)
+    fetch(`/api/chat/rooms/my?page=0&size=50`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    })
       .then(res => {
         if (!res.ok) throw new Error("채팅방 목록 조회 실패");
         return res.json();
@@ -36,8 +41,10 @@ export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin
     try {
       const res = await fetch(`/api/chat/rooms`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId })
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAccessToken()}`
+        }
       });
       
       const json = await res.json();
