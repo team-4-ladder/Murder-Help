@@ -1,8 +1,26 @@
 import { useEffect, useState } from "react";
-import { fetchProductDetail, fetchProductList, searchProducts, PAGE_SIZE, type ApiProduct, type ApiProductSort, type ProductDetailData } from "./api/products";
+import {
+  addCartItem,
+  deleteCartItem,
+  fetchCartItems,
+  updateCartItemQuantity,
+  type CartItemDetailData,
+} from "./api/cart";
+import {
+  fetchPopularSearches,
+  fetchProductDetail,
+  fetchProductList,
+  searchProducts,
+  PAGE_SIZE,
+  type ApiProduct,
+  type ApiProductSort,
+  type PopularSearch,
+  type ProductDetailData,
+} from "./api/products";
 import { NAV_ITEMS, SUBCATS, type Tier } from "./catalog";
 import { Gate } from "./components/auth/Gate";
 import { LoginModal } from "./components/auth/LoginModal";
+import { logout } from "./api/auth";
 import { CartView } from "./components/cart/CartView";
 import { FloatingChatWidget } from "./components/chat/FloatingChatWidget";
 import { Spinner } from "./components/common/Spinner";
@@ -16,7 +34,7 @@ import { ProductCard } from "./components/product/ProductCard";
 import { ProductDetail } from "./components/product/ProductDetail";
 import { Sidebar } from "./components/product/Sidebar";
 import { ACCOUNTS } from "./lib/accounts";
-import { cartKeyFor, drop, read, SESSION_KEY, write } from "./lib/storage";
+import { drop, read, SESSION_KEY, write } from "./lib/storage";
 import { C } from "./lib/theme";
 import { canAccess, TIERS, tierFor } from "./lib/tier";
 
@@ -30,11 +48,25 @@ type Session = {
 /* ─── 주문 ───────────────────────────────────────────────── */
 type CartLine = { id: string; qty: number };
 
+function toCartProduct(item: CartItemDetailData): ApiProduct {
+  return {
+    productId: item.productId,
+    id: item.productCode,
+    name: item.name,
+    category: item.category,
+    sub: item.subCategory,
+    price: item.price,
+    tier: item.tier,
+    img: item.imageUrl,
+    desc: "",
+    specs: [],
+  };
+}
+
 /* 장바구니 담기와 결제는 로그인이 필요하다. 비로그인 상태에서 누른 동작을
    여기에 담아 두었다가 로그인에 성공하면 이어서 실행한다. */
 type Pending =
   | { kind: "add"; id: string; qty: number }
-  | { kind: "buy"; id: string; qty: number }
   | { kind: "checkout" };
 
 /* ─── 화면 ───────────────────────────────────────────────── */
@@ -49,10 +81,12 @@ type View =
 /* ─── main app ───────────────────────────────────────────── */
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => read<Session | null>(SESSION_KEY, null));
-  const [cart, setCart] = useState<CartLine[]>(() => {
-    const saved = read<Session | null>(SESSION_KEY, null);
-    return saved ? read<CartLine[]>(cartKeyFor(saved.id), []) : [];
-  });
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cartItemIds, setCartItemIds] = useState<Record<string, number>>({});
+  const [cartLoading, setCartLoading] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [cartReloadKey, setCartReloadKey] = useState(0);
+  const [cartPendingIds, setCartPendingIds] = useState<Set<string>>(() => new Set());
   const [view, setView] = useState<View>({ name: "list" });
   const [showLogin, setShowLogin] = useState(false);
   /* 로그인이 필요해 막힌 동작. 로그인에 성공하면 이어서 실행한다 */
@@ -75,7 +109,7 @@ export default function App() {
      상세조회에는 목록 API가 내려준 DB 상품 ID(productId)를 사용한다. */
   const [productCache, setProductCache] = useState<Record<string, ApiProduct>>({});
   const [listItems, setListItems] = useState<ApiProduct[]>([]);
-  const [listPage, setListPage] = useState(1);
+  const [listPage, setListPage] = useState(0);
   const [listHasNext, setListHasNext] = useState(false);
   const [listTotal, setListTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
@@ -83,6 +117,8 @@ export default function App() {
   const [sortKey, setSortKey] = useState<ApiProductSort>("POPULAR");
   const [searchInput, setSearchInput] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
   const [detailProduct, setDetailProduct] = useState<ProductDetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -102,6 +138,23 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+  useEffect(() => {
+    if (!searchFocused || searchInput.trim()) return;
+
+    let cancelled = false;
+    fetchPopularSearches()
+      .then((searches) => {
+        if (!cancelled) setPopularSearches(searches);
+      })
+      .catch(() => {
+        if (!cancelled) setPopularSearches([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchFocused, searchInput]);
+
   const isSearching = searchKeyword.length > 0;
 
   function requestPage(page: number) {
@@ -112,7 +165,6 @@ export default function App() {
           sort: sortKey,
           page,
           size: PAGE_SIZE,
-          memberTier: userTier ?? activeCodeTab,
         })
       : fetchProductList({
           category: activeNav,
@@ -121,7 +173,6 @@ export default function App() {
           sort: sortKey,
           page,
           size: PAGE_SIZE,
-          memberTier: userTier ?? activeCodeTab,
         });
   }
 
@@ -133,11 +184,11 @@ export default function App() {
     setListLoading(true);
     setListError(false);
 
-    requestPage(1)
+    requestPage(0)
       .then((res) => {
         if (cancelled) return;
         setListItems(res.items);
-        setListPage(1);
+        setListPage(0);
         setListHasNext(res.hasNext);
         setListTotal(res.totalElements);
         cacheProducts(res.items);
@@ -196,7 +247,7 @@ export default function App() {
     setDetailLoading(true);
     setDetailError(null);
 
-    fetchProductDetail(detailProductId, userTier, controller.signal)
+    fetchProductDetail(detailProductId, controller.signal)
       .then((product) => {
         setDetailProduct(product);
         cacheProducts([product]);
@@ -214,11 +265,49 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, userTier, detailProductId, detailReloadKey]);
 
-  /* 로그인한 계정 앞으로만 저장한다. 로그아웃 상태에서는 담을 수 없으므로
-     저장할 것도 없고, 저장된 장바구니는 다음 로그인 때까지 그대로 남는다. */
+  /* 장바구니는 로그인한 회원의 서버 데이터로 구성한다. */
   useEffect(() => {
-    if (session) write(cartKeyFor(session.id), cart);
-  }, [cart, session]);
+    if (!session) {
+      setCart([]);
+      setCartItemIds({});
+      setCartLoading(false);
+      setCartError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCartLoading(true);
+    setCartError(null);
+
+    fetchCartItems()
+      .then((items) => {
+        if (cancelled) return;
+
+        const products = items.map(toCartProduct);
+        setProductCache((prev) => {
+          const next = { ...prev };
+          for (const product of products) next[product.id] = product;
+          return next;
+        });
+        setCart(items.map((item) => ({ id: item.productCode, qty: item.quantity })));
+        setCartItemIds(
+          Object.fromEntries(items.map((item) => [item.productCode, item.id]))
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setCart([]);
+        setCartItemIds({});
+        setCartError(error instanceof Error ? error.message : "장바구니를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setCartLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.id, cartReloadKey]);
 
   /* 누적 구매금액이 올라가도 같은 자리에서 저장된다 */
   useEffect(() => {
@@ -264,14 +353,20 @@ export default function App() {
     navigate({ name: "list" });
   }
 
+  function openCart() {
+    setCartReloadKey((key) => key + 1);
+    navigate({ name: "cart" });
+  }
+
   function handleLogin(id: string, spent: number) {
     setSession({ id, spent });
     const tier = tierFor(spent, id);
     setActiveCodeTab(tier === "green" ? "red" : tier);
     setShowLogin(false);
 
-    /* 이 계정이 지난번에 담아둔 장바구니를 되살린다 */
-    setCart(read<CartLine[]>(cartKeyFor(id), []));
+    /* 서버 장바구니는 session 변경을 감지한 조회 effect에서 불러온다. */
+    setCart([]);
+    setCartItemIds({});
 
     /* 로그인 직전에 막혔던 동작을 이어서 실행한다.
        이 시점에는 session 이 아직 갱신 전이라 로그인 검사를 다시 하지 않는다. */
@@ -284,15 +379,19 @@ export default function App() {
       return;
     }
     putInCart(pending.id, pending.qty);
-    if (pending.kind === "buy") navigate({ name: "checkout" });
   }
 
-  function handleLogout() {
-    setSession(null);
-    setActiveCodeTab("red");
-    /* 화면에서만 비운다. 저장된 장바구니는 다음 로그인 때 돌아온다 */
-    setCart([]);
-    navigate({ name: "list" });
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSession(null);
+      setActiveCodeTab("red");
+      setCart([]);
+      navigate({ name: "list" });
+    }
   }
 
   function changeNav(cat: string) {
@@ -321,8 +420,8 @@ export default function App() {
     });
   }
 
-  /* 담겼으면 true. 로그인이 필요하면 로그인 모달을 띄우고 false */
-  function addToCart(id: string, qty: number): boolean {
+  /* 서버 장바구니에 담긴 경우에만 화면 장바구니에도 반영한다. */
+  async function addToCart(id: string, qty: number): Promise<boolean> {
     if (!userTier) {
       setAfterLogin({ kind: "add", id, qty });
       setShowLogin(true);
@@ -331,16 +430,69 @@ export default function App() {
     /* 등급이 모자라면 담을 수 없다 */
     const p = productCache[id];
     if (!p || !canAccess(userTier, p.tier)) return false;
-    putInCart(id, qty);
+
+    const savedItem = await addCartItem(p.productId, qty);
+    setCartItemIds((prev) => ({ ...prev, [id]: savedItem.id }));
+    setCart((prev) => {
+      const found = prev.some((line) => line.id === id);
+      if (found) {
+        return prev.map((line) =>
+          line.id === id ? { ...line, qty: savedItem.quantity } : line
+        );
+      }
+      return [...prev, { id, qty: savedItem.quantity }];
+    });
+
     return true;
   }
 
-  function setQty(id: string, qty: number) {
-    setCart((prev) => prev.map((l) => (l.id === id ? { ...l, qty } : l)));
+  async function setQty(id: string, qty: number) {
+    const cartItemId = cartItemIds[id];
+    if (cartItemId === undefined || cartPendingIds.has(id)) return;
+
+    setCartPendingIds((prev) => new Set(prev).add(id));
+    setCartError(null);
+
+    try {
+      const updatedItem = await updateCartItemQuantity(cartItemId, qty);
+      setCart((prev) =>
+        prev.map((line) => line.id === id ? { ...line, qty: updatedItem.quantity } : line)
+      );
+    } catch (error) {
+      setCartError(error instanceof Error ? error.message : "장바구니 수량을 변경하지 못했습니다.");
+    } finally {
+      setCartPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
-  function removeLine(id: string) {
-    setCart((prev) => prev.filter((l) => l.id !== id));
+  async function removeLine(id: string) {
+    const cartItemId = cartItemIds[id];
+    if (cartItemId === undefined || cartPendingIds.has(id)) return;
+
+    setCartPendingIds((prev) => new Set(prev).add(id));
+    setCartError(null);
+
+    try {
+      await deleteCartItem(cartItemId);
+      setCart((prev) => prev.filter((line) => line.id !== id));
+      setCartItemIds((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (error) {
+      setCartError(error instanceof Error ? error.message : "장바구니 상품을 삭제하지 못했습니다.");
+    } finally {
+      setCartPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   function goCheckout() {
@@ -350,18 +502,6 @@ export default function App() {
       setShowLogin(true);
       return;
     }
-    navigate({ name: "checkout" });
-  }
-
-  function buyNow(id: string, qty: number) {
-    if (!userTier) {
-      setAfterLogin({ kind: "buy", id, qty });
-      setShowLogin(true);
-      return;
-    }
-    const p = productCache[id];
-    if (!p || !canAccess(userTier, p.tier)) return;
-    putInCart(id, qty);
     navigate({ name: "checkout" });
   }
 
@@ -446,7 +586,7 @@ export default function App() {
             {/* Right actions */}
             <div className="flex items-center gap-3">
               {/* search */}
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs"
+              <div className="relative hidden md:flex items-center gap-2 px-3 py-1.5 text-xs"
                 style={{ background: "rgba(0,0,0,0.5)", border: `1px solid ${C.panelBorder}` }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
                   <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -454,15 +594,43 @@ export default function App() {
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   placeholder="검색..."
                   className="bg-transparent outline-none w-20 text-xs"
                   style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}
                 />
+                {searchFocused && !searchInput.trim() && popularSearches.length > 0 && (
+                  <div
+                    className="absolute top-full left-0 z-50 mt-2 w-52 p-2"
+                    style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+                  >
+                    <p className="px-2 py-1 text-[10px] tracking-widest" style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
+                      POPULAR SEARCHES
+                    </p>
+                    {popularSearches.map((search) => (
+                      <button
+                        key={search.keyword}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setSearchInput(search.keyword);
+                          setSearchFocused(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs"
+                        style={{ color: C.textDim }}
+                      >
+                        <span style={{ color: C.red, fontFamily: "Share Tech Mono" }}>{search.rank}</span>
+                        <span className="truncate">{search.keyword}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* cart */}
               <button
-                onClick={() => navigate({ name: "cart" })}
+                onClick={openCart}
                 className="relative flex items-center justify-center transition-all"
                 style={{ width: 34, height: 30, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
                 aria-label="장바구니"
@@ -777,7 +945,6 @@ export default function App() {
           p={detailProduct}
           onBack={() => navigate({ name: "list" })}
           onAddToCart={(qty) => addToCart(detailProduct.id, qty)}
-          onBuyNow={(qty) => buyNow(detailProduct.id, qty)}
         />
       )}
 
@@ -808,8 +975,12 @@ export default function App() {
       {session && view.name === "cart" && (
         <CartView
           lines={cartLines}
+          loading={cartLoading}
+          error={cartError}
+          pendingIds={cartPendingIds}
           onQty={setQty}
           onRemove={removeLine}
+          onRetry={() => setCartReloadKey((key) => key + 1)}
           onContinue={() => navigate({ name: "list" })}
           onCheckout={goCheckout}
         />

@@ -30,6 +30,9 @@ public enum ErrorCode {
     INVALID_STOCK(HttpStatus.BAD_REQUEST, "PRODUCT_004", "재고는 0 이상이어야 합니다."),
     PRODUCT_NOT_ON_SALE(HttpStatus.CONFLICT, "PRODUCT_005", "현재 판매하지 않는 상품입니다."),
 
+    // Cart
+    CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_001", "장바구니 상품을 찾을 수 없습니다."),
+
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_002", "유효하지 않은 주문 상태 변경입니다."),
@@ -69,7 +72,10 @@ public enum ErrorCode {
     // Chat
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),
     INVALID_CHAT_ROOM_STATUS(HttpStatus.BAD_REQUEST, "CHAT_002", "유효하지 않은 채팅방 상태 변경입니다."),
-    ALREADY_ACTIVE_ROOM_EXISTS(HttpStatus.BAD_REQUEST, "CHAT_003", "이미 진행 중인 상담이 존재합니다.")
+    ALREADY_ACTIVE_ROOM_EXISTS(HttpStatus.BAD_REQUEST, "CHAT_003", "이미 진행 중인 상담이 존재합니다."),
+    
+    // Review
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다.")
     ;
 
     private final HttpStatus status;

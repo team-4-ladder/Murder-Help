@@ -8,7 +8,7 @@ import org.example.murderhelp.domain.product.entity.ProductStatus;
 import org.example.murderhelp.domain.product.entity.ProductTier;
 import org.example.murderhelp.domain.product.entity.Product;
 import org.example.murderhelp.domain.product.repository.ProductRepository;
-import org.example.murderhelp.global.config.cache.LocalCacheConfig;
+import org.example.murderhelp.global.config.cache.CacheNames;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
 import org.example.murderhelp.global.response.PageResponse;
@@ -18,12 +18,30 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ProductService {
 
     private final ProductRepository productRepository;
 
+    // 주문 도메인에서 요청하신 메서드입니다.
+    @Transactional
+    public List<Product> getProducts(List<Long> productIds) {
+        if (productIds == null || productIds.stream().anyMatch(id -> id == null)) {
+            throw new IllegalArgumentException("상품 ID는 필수입니다.");
+        }
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        return productRepository.findAllByIdInForUpdate(productIds.stream().distinct().toList());
+    }
+
+    @Cacheable(
+            cacheNames = CacheNames.PRODUCT_DETAIL,
+            key = "'id:' + #productId + ':memberTier:' + #memberTier"
+    )
     @Transactional(readOnly = true)
     public ProductDetailResponse getProduct(ProductTier memberTier, Long productId) {
         Product product = productRepository
@@ -38,6 +56,13 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(
+            cacheNames = CacheNames.PRODUCT_LIST,
+            key = "'category:' + #category + ':subCategory:' + #subCategory"
+                    + " + ':requestedTier:' + #requestedTier + ':memberTier:' + #memberTier"
+                    + " + ':page:' + #pageable.pageNumber + ':size:' + #pageable.pageSize"
+                    + " + ':sort:' + #sort"
+    )
     public PageResponse<ProductResponse> getProducts(
             ProductTier memberTier,
             ProductTier requestedTier,
@@ -89,7 +114,7 @@ public class ProductService {
      * 반드시 다른 빈(컨트롤러)이 직접 호출해야 한다.
      */
     @Cacheable(
-            cacheNames = LocalCacheConfig.PRODUCT_SEARCH_CACHE,
+            cacheNames = CacheNames.PRODUCT_SEARCH,
             key = "'keyword:' + #keyword + ':tier:' + #tier"
                     + " + ':page:' + #pageable.pageNumber + ':size:' + #pageable.pageSize"
                     + " + ':sort:' + #sort"
