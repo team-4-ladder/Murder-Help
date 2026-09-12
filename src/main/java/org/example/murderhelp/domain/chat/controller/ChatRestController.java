@@ -1,6 +1,5 @@
 package org.example.murderhelp.domain.chat.controller;
 
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
