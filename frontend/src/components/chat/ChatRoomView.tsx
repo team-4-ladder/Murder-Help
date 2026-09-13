@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useChatRoom } from "./useChatRoom";
 import { ChatMessageBubble } from "./ChatMessageBubble";
-import { getAccessToken } from "../../api/auth";
+import { getAccessToken } from "../../api/client";
 
 export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { roomId: number; customerId: number; isAdmin?: boolean }) {
   const [input, setInput] = useState("");

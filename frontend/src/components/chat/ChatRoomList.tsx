@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChatRoomResponse } from "./chat.types";
-import { getAccessToken } from "../../api/auth";
+import { getAccessToken } from "../../api/client";
 
 export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin }: { customerId: number; onSelectRoom: (id: number) => void; preventAutoJoin?: boolean }) {
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);

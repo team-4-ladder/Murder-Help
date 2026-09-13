@@ -3,7 +3,7 @@ import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import ChatRoomView from "./ChatRoomView";
 import type { ChatRoomResponse } from "./chat.types";
-import { getAccessToken } from "../../api/auth";
+import { getAccessToken } from "../../api/client";
 
 export default function AdminChatDashboard() {
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);

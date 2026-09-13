@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import type { ChatMessageResponse } from "./chat.types";
-import { getAccessToken } from "../../api/auth";
+import { getAccessToken } from "../../api/client";
 
 export function useChatRoom(roomId: number) {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
