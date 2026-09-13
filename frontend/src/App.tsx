@@ -503,9 +503,9 @@ export default function App() {
   }
 
   /* 로그인과 새로고침 복원 모두 서버 회원 정보로 세션을 만들고, 등급 탭을 내 등급으로 맞춘다 */
-  function applyMember(id: string, spent: number) {
-    setSession({ id, spent });
-    const tier = tierFor(spent, id);
+   function handleLogin(id: string, spent: number, grade?: Tier) {
+    setSession({ id, spent, grade });
+    const tier = grade ?? tierFor(spent, id);
     setActiveCodeTab(tier === "green" ? "red" : tier);
   }
 
