@@ -45,8 +45,8 @@ public class RefundItem extends BaseTimeEntity {
         this.pgRefundAmount = pgRefundAmount;
     }
 
-    // 연관관계 편의 메서드 (Refund 엔티티에서 호출)
-    void assignRefund(Refund refund) {
+    // 연관관계 편의 메서드
+    public void assignRefund(Refund refund) {
         this.refund = refund;
     }
 }
