@@ -1,6 +1,5 @@
 package org.example.murderhelp.infra.portone.webhook;
 
-import io.portone.sdk.server.common.Country;
 import io.portone.sdk.server.webhook.Webhook;
 import io.portone.sdk.server.webhook.WebhookTransactionCancelledCancelled;
 import io.portone.sdk.server.webhook.WebhookTransactionCancelledPartialCancelled;
@@ -11,7 +10,6 @@ import org.example.murderhelp.domain.payment.entity.Payment;
 import org.example.murderhelp.domain.payment.entity.PaymentStatus;
 import org.example.murderhelp.domain.payment.port.PaymentGateway;
 import org.example.murderhelp.domain.payment.port.PaymentGatewayResponse;
-import org.example.murderhelp.domain.payment.repository.dto.PaymentWithItems;
 import org.example.murderhelp.domain.payment.service.PaymentCommandService;
 import org.example.murderhelp.domain.payment.service.PaymentService;
 import org.example.murderhelp.domain.refund.facade.RefundFacade;
