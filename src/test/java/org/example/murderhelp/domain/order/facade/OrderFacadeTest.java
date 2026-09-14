@@ -84,7 +84,7 @@ class OrderFacadeTest {
         sequence.verify(productService).getProducts(List.of(100L));
         sequence.verify(product).decreaseStock(2);
         sequence.verify(orderService).createOrder(memberId, request, cartItems, Map.of(100L, product));
-        sequence.verify(paymentService).createPayment(order, 2000);
+        sequence.verify(paymentService).createPayment(order, 2000L);
         sequence.verify(productCacheEvictionService).evictProductCaches();
         // 장바구니 삭제는 결제 확정 시점(PaymentCommandService)으로 옮겨졌다
         verify(cartService, never()).deleteItems(anyLong(), anyList());
