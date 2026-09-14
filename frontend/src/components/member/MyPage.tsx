@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { getAccessToken } from "../../api/auth";
+import { authFetch } from "../../api/client";
+import type { OrderData, OrderItemData } from "../../api/orders";
 import { C } from "../../lib/theme";
 import { PageTitle } from "../common/PageTitle";
+import { MyOrders } from "./MyOrders";
 
 type Section = "home" | "orders" | "reviews";
 type Tab = "pending" | "written";
@@ -16,6 +18,9 @@ type PendingReview = {
     imageUrl?: string;
 };
 
+/* 리뷰 작성 화면에 넘기는 값 — 주문내역에서 오면 orderItemId 가 없을 수 있다(아직 백엔드 응답에 없음) */
+type ReviewTarget = Omit<PendingReview, "orderItemId"> & { orderItemId?: number };
+
 type WrittenReview = {
     reviewId: number;
     productId: number;
@@ -27,16 +32,7 @@ type WrittenReview = {
 };
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
-    const token = getAccessToken();
-
-    const response = await fetch(url, {
-        ...options,
-        credentials: "include",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            ...options.headers,
-        },
-    });
+    const response = await authFetch(url, options);
 
     const body = (await response.json().catch(() => null)) as Api<T> | null;
 
@@ -58,12 +54,13 @@ export function MyPage({ onBack }: { onBack: () => void }) {
 
     const [pending, setPending] = useState<PendingReview[]>([]);
     const [written, setWritten] = useState<WrittenReview[]>([]);
-    const [selected, setSelected] = useState<PendingReview | null>(null);
+    const [selected, setSelected] = useState<ReviewTarget | null>(null);
 
     const [rating, setRating] = useState(5);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
 
     async function loadReviews() {
         setLoading(true);
@@ -94,7 +91,7 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         }
     }, [section]);
 
-    function openWrite(review: PendingReview) {
+    function openWrite(review: ReviewTarget) {
         setSelected(review);
         setRating(5);
         setContent("");
@@ -102,8 +99,24 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         setReviewView("write");
     }
 
+    /* 주문내역의 '리뷰 작성' — 리뷰 작성 화면을 그대로 같이 쓴다 */
+    function openWriteFromOrder(order: OrderData, item: OrderItemData) {
+        openWrite({
+            orderItemId: item.orderItemId,
+            productCode: item.productCode ?? "",
+            productName: item.productName,
+            purchasedAt: order.orderedAt ?? "",
+            imageUrl: item.imageUrl,
+        });
+    }
+
     async function submitReview() {
         if (!selected) return;
+
+        if (selected.orderItemId === undefined) {
+            setError("주문 상품 번호가 없어 리뷰를 등록할 수 없습니다.");
+            return;
+        }
 
         if (!content.trim()) {
             setError("리뷰 내용을 입력해 주세요.");
@@ -124,6 +137,13 @@ export function MyPage({ onBack }: { onBack: () => void }) {
             setSelected(null);
             setContent("");
             setReviewView("list");
+
+            /* 주문내역에서 왔으면 주문내역으로 돌아가고, '리뷰 작성 완료' 로 바뀌게 다시 불러온다 */
+            if (section === "orders") {
+                setOrdersRefreshKey((key) => key + 1);
+                return;
+            }
+
             setTab("written");
 
             await loadReviews();
@@ -186,7 +206,7 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                             key={key}
                             onClick={() => {
                                 setSection(key);
-                                if (key === "reviews") setReviewView("list");
+                                setReviewView("list");
                             }}
                             className="block w-full text-left px-4 py-3 text-sm"
                             style={{
@@ -213,15 +233,15 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                         </>
                     )}
 
+                    {/* 리뷰를 쓰는 동안 숨기기만 해서, 돌아왔을 때 기간·페이지가 그대로 남게 한다 */}
                     {section === "orders" && (
-                        <>
-                            <PageTitle note="// 주문 조회 · 배송 상태 · 취소">
-                                My Orders
-                            </PageTitle>
-                            <p style={{ color: C.textMuted }}>
-                                주문 내역 화면을 이 영역에 연결하면 됩니다.
-                            </p>
-                        </>
+                        <div hidden={reviewView === "write"}>
+                            <MyOrders
+                                onShop={onBack}
+                                onWriteReview={openWriteFromOrder}
+                                refreshKey={ordersRefreshKey}
+                            />
+                        </div>
                     )}
 
                     {section === "reviews" && reviewView === "list" && (
@@ -324,7 +344,7 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                                 <>
                                     {written.length === 0 && (
                                         <p className="py-12 text-center" style={{ color: C.textMuted }}>
-                                            작성한 리뷰이 없습니다.
+                                            작성한 리뷰가 없습니다.
                                         </p>
                                     )}
 
@@ -368,8 +388,8 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                         </>
                     )}
 
-                    {section === "reviews" &&
-                        reviewView === "write" &&
+                    {/* 리뷰 목록과 주문내역 양쪽에서 들어온다 */}
+                    {reviewView === "write" &&
                         selected && (
                             <>
                                 <button
@@ -377,7 +397,7 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                                     className="text-xs mb-5"
                                     style={{ color: C.textMuted }}
                                 >
-                                    ← 리뷰 목록으로
+                                    {section === "orders" ? "← 주문내역으로" : "← 리뷰 목록으로"}
                                 </button>
 
                                 <PageTitle note={`// REVIEWS / WRITE · ${selected.productCode}`}>

@@ -1,27 +1,15 @@
 import { useState, type FormEvent } from "react";
 import { login, signup, type Member } from "../../api/auth";
 import { C } from "../../lib/theme";
+import { spentFromGrade } from "../../lib/tier";
 import { Spinner } from "../common/Spinner";
+import type { Tier } from "../../catalog";
 
 type LoginModalProps = {
   // 기존 App.tsx의 handleLogin(id, spent)과 호환되도록 유지
-  onLogin: (id: string, spent: number) => void;
+  onLogin: (id: string, spent: number, grade?: Tier) => void;
   onClose: () => void;
 };
-
-function spentFromGrade(grade: Member["grade"]) {
-  switch (grade) {
-    case "GREEN":
-      return 1_000_000;
-    case "RED":
-      return 800_000;
-    case "PURPLE":
-      return 200_000;
-    case "YELLOW":
-    default:
-      return 0;
-  }
-}
 
 export function LoginModal({ onLogin, onClose }: LoginModalProps) {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -50,7 +38,7 @@ export function LoginModal({ onLogin, onClose }: LoginModalProps) {
   }
 
   function completeLogin(member: Member) {
-    onLogin(String(member.id), spentFromGrade(member.grade));
+    onLogin(String(member.id), spentFromGrade(member.grade), member.grade.toLowerCase() as Tier);
   }
 
   async function handleLogin(event: FormEvent) {
