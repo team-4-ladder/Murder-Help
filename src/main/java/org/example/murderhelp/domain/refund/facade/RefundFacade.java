@@ -70,6 +70,7 @@ public class RefundFacade {
         return RefundResponse.from(savedRefund);
     }
 
+    /*
     public void syncCancelFromPg(String portonePaymentId, String reason) {
         log.info("========== [웹훅 취소 동기화 진입] ========== portonePaymentId={}", portonePaymentId);
 
@@ -82,4 +83,5 @@ public class RefundFacade {
 
         log.info("웹훅 취소 동기화 완료. Refund ID: {}", savedRefund.getId());
     }
+    */
 }
