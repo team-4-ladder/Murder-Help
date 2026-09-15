@@ -331,16 +331,16 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         setReviewView("edit");
     }
 
-    function openWriteFromOrder(order: OrderData, item: OrderItemData) {
+    function openWriteFromOrder(_order: OrderData, _item: OrderItemData,
+    ) {
+        // 주문내역에서는 리뷰 작성 화면을 바로 열지 않는다.
+        // 리뷰 관리의 작성 가능 목록으로 이동한 뒤,
+        // /api/reviews/pending 응답의 orderItemId를 사용한다.
         setSection("reviews");
         setTab("pending");
-        openWrite({
-            orderItemId: item.orderItemId,
-            productCode: item.productCode ?? "",
-            productName: item.productName,
-            purchasedAt: order.orderedAt ?? "",
-            imageUrl: item.imageUrl,
-        });
+        setSelected(null);
+        setError("");
+        setReviewView("list");
     }
 
     async function submitReview() {
