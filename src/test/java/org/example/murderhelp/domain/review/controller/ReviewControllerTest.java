@@ -1,5 +1,6 @@
 package org.example.murderhelp.domain.review.controller;
 
+import org.example.murderhelp.domain.review.dto.PendingReviewResponse;
 import org.example.murderhelp.domain.review.dto.ReviewCreateRequest;
 import org.example.murderhelp.domain.review.dto.ReviewResponse;
 import org.example.murderhelp.domain.review.dto.ReviewUpdateRequest;
@@ -16,7 +17,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewControllerTest {
@@ -28,10 +30,41 @@ class ReviewControllerTest {
     private ReviewService reviewService;
 
     @Test
+    @DisplayName("리뷰 작성 가능 상품 조회 요청을 서비스에 전달한다")
+    void getPendingReviews() {
+        // given
+        LocalDateTime purchasedAt =
+                LocalDateTime.of(2026, 9, 15, 15, 30);
+
+        PendingReviewResponse pendingReview =
+                new PendingReviewResponse(
+                        10L,
+                        "TEST-001",
+                        "리뷰 테스트 상품",
+                        purchasedAt,
+                        "https://example.com/product.png"
+                );
+
+        when(reviewService.getPendingReviews(1L))
+                .thenReturn(List.of(pendingReview));
+
+        // when
+        ApiResponse<List<PendingReviewResponse>> result =
+                reviewController.getPendingReviews(1L);
+
+        // then
+        assertThat(result.getCode()).isEqualTo("SUCCESS");
+        assertThat(result.getData()).containsExactly(pendingReview);
+
+        verify(reviewService).getPendingReviews(1L);
+    }
+
+    @Test
     @DisplayName("내 리뷰 목록 조회 요청을 서비스에 전달한다")
     void getMyReviews() {
         // given
-        ReviewResponse review = reviewResponse(100L, 10L, 1L, 5, "좋은 상품입니다.");
+        ReviewResponse review =
+                reviewResponse(100L, 10L, 1L, 5, "좋은 상품입니다.");
 
         when(reviewService.getMyReviews(1L))
                 .thenReturn(List.of(review));
