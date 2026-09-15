@@ -51,8 +51,6 @@ public class RedisCacheConfig {
                         .constructCollectionType(List.class, CartItemDetailResponse.class));
         RedisCacheConfiguration cartItemsConfiguration = defaultConfiguration
                 .entryTtl(CART_ITEMS_TTL)
-                // 기존 직렬화 형식의 캐시와 분리한다. 조회와 삭제 모두 이 접두사를 사용한다.
-                .computePrefixWith(cacheName -> cacheName + ":v2::")
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(cartSerializer));
 
         return RedisCacheManager.builder(connectionFactory)
