@@ -1,0 +1,40 @@
+spring:
+  config:
+    import: "aws-parameterstore:/murder-help/${APP_ENV:prod}/"
+  cache:
+    type: redis
+  datasource:
+    url: jdbc:mysql://${AWS_RDS_HOST}:${AWS_RDS_PORT}/murder_help
+    username: ${AWS_RDS_USERNAME}
+    password: ${AWS_RDS_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${AWS_REDIS_HOST}
+      port: ${AWS_REDIS_PORT:6379}
+      username: ${AWS_REDIS_USERNAME:}
+      password: ${AWS_REDIS_PASSWORD:}
+      ssl:
+        enabled: ${AWS_REDIS_SSL_ENABLED:false}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+aws:
+  s3:
+    bucket: murder-help-bucket
+    prefix: ${APP_ENV:prod}
+
+# JWT 설정
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 3600000  # 1시간 (ms)
+
+# PortOne 결제 연동 정보 (GitHub Secrets에서 주입)
+portone:
+  base-url: "https://api.portone.io"
+  api-secret: ${PORTONE_API_SECRET}
+  store-id: ${PORTONE_STORE_ID}
+  channel-key: ${PORTONE_CHANNEL_KEY}
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET}

@@ -1,0 +1,80 @@
+### 실행 전 확인
+# 1. 애플리케이션을 실행합니다.
+# 2. 아래 email/password에 실제 가입된 회원 정보를 입력합니다.
+# 3. DB에 category와 productTier에 해당하는 상품이 있어야 합니다.
+# 4. 로그인 → 목록 조회 → 상세 조회 순서로 실행합니다.
+# 5. 목록 조회를 실행하면 첫 상품 ID가 상세조회 요청에 자동으로 저장됩니다.
+
+@host = http://localhost:8080
+@email = member@example.com
+@password = password123
+@category = Guns
+@productTier = yellow
+
+### 로그인 - 실제 JWT Access Token 발급
+POST {{host}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("로그인하고 Access Token을 발급받는다", function () {
+        client.assert(response.status === 200, "HTTP 상태가 200이 아닙니다.");
+        client.assert(response.body.code === "SUCCESS", "응답 코드가 SUCCESS가 아닙니다.");
+        client.assert(response.body.data.accessToken, "Access Token이 없습니다.");
+    });
+
+    client.global.set("accessToken", response.body.data.accessToken);
+%}
+
+### 상품 목록 조회
+GET {{host}}/api/products?category={{category}}&tier={{productTier}}&sort=POPULAR&page=0&size=100
+Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+> {%
+    client.test("상품 목록을 조회한다", function () {
+        client.assert(response.status === 200, "HTTP 상태가 200이 아닙니다.");
+        client.assert(response.body.code === "SUCCESS", "응답 코드가 SUCCESS가 아닙니다.");
+        client.assert(Array.isArray(response.body.data.items), "상품 목록 형식이 아닙니다.");
+        client.assert(response.body.data.items.length > 0, "조회된 상품이 없습니다.");
+    });
+
+    const items = response.body.data.items;
+    if (items.length > 0) {
+        client.global.set("productId", items[0].id);
+    }
+%}
+
+### 상품 상세조회 - 위 목록에서 조회된 첫 상품 ID 사용
+GET {{host}}/api/products/{{productId}}
+Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+> {%
+    client.test("상품 상세정보를 조회한다", function () {
+        client.assert(response.status === 200, "HTTP 상태가 200이 아닙니다.");
+        client.assert(response.body.code === "SUCCESS", "응답 코드가 SUCCESS가 아닙니다.");
+        client.assert(response.body.data.id !== null, "상품 ID가 없습니다.");
+        client.assert(response.body.data.productCode, "상품 코드가 없습니다.");
+        client.assert(response.body.data.name, "상품명이 없습니다.");
+        client.assert(response.body.data.imageUrl, "상품 이미지 URL이 없습니다.");
+
+        const specs = response.body.data.specs;
+        client.assert(Array.isArray(specs), "상품 제원 형식이 아닙니다.");
+        client.assert(specs.length > 0, "상품 제원이 비어 있습니다.");
+
+        specs.forEach(function (spec, index) {
+            client.assert(spec.name, index + "번째 상품 제원명이 없습니다.");
+            client.assert(spec.value, index + "번째 상품 제원값이 없습니다.");
+            client.assert(
+                Number.isInteger(spec.sortOrder),
+                index + "번째 상품 제원 정렬 순서가 없습니다."
+            );
+        });
+    });
+%}
