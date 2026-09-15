@@ -4,7 +4,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.bot.dto.BotMessageDto;
 import org.example.murderhelp.domain.chat.bot.dto.BotOptionDto;
-import org.example.murderhelp.domain.chat.bot.dto.BotProductDto;
 
 import java.util.List;
 
