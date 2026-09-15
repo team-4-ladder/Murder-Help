@@ -43,12 +43,14 @@ type ReviewTarget = Omit<PendingReview, "orderItemId"> & {
 
 type WrittenReview = {
     reviewId: number;
+    orderItemId: number;
     productId: number;
-    productCode?: string;
-    productName?: string;
+    productCode: string;
+    productName: string;
     rating: number;
     content: string;
     createdAt: string;
+    updatedAt: string;
 };
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -320,8 +322,8 @@ export function MyPage({ onBack }: { onBack: () => void }) {
     function openEdit(review: WrittenReview) {
         setSection("reviews");
         setSelected({
-            productCode: review.productCode ?? `상품 #${review.productId}`,
-            productName: review.productName ?? "작성한 리뷰",
+            productCode: review.productCode,
+            productName: review.productName,
             purchasedAt: review.createdAt,
         });
         setEditingReviewId(review.reviewId);
@@ -748,7 +750,7 @@ export function MyPage({ onBack }: { onBack: () => void }) {
 
                     {section === "reviews" && reviewView === "list" && (
                         <>
-                            <PageTitle note="// 구매 확정 상품의 리뷰를 작성하고 관리합니다">
+                            <PageTitle>
                                 My Review Management
                             </PageTitle>
 
@@ -875,12 +877,14 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                                             }}
                                         >
                                             <div className="flex-1">
-                                                <div style={{ color: C.text }}>
-                                                    {"★".repeat(review.rating)}{" "}
-                                                    <span style={{ color: C.textMuted }}>
-                                                        {review.productCode ??
-                                                            `상품 #${review.productId}`}
-                                                    </span>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  <span style={{color: C.redBright, letterSpacing: 2,}}>
+                                                    {"★".repeat(review.rating)}
+                                                  </span>
+                                                    <span
+                                                        style={{color: C.text, fontFamily: "Noto Sans KR, sans-serif",}}>
+                                                    {review.productName}
+                                                  </span>
                                                 </div>
 
                                                 <p
