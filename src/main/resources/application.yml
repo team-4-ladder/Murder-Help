@@ -14,14 +14,14 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/killer_mall?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: killer_admin
-    password: 12345678
+    username: root
+    password: a12345
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
@@ -65,7 +65,14 @@ server:
 jwt:
   secret: "c3BhcnRhLXBheW1lbnQtand0LXNlY3JldC1rZXktZm9yLWJvb3RjYW1wLTIwMjYtdmVyeS1sb25nLXNlY3JldA=="  # Base64 encoded
   access-expiration: 1800000  # 1시간 (ms)
-  refresh-expiration: 1209600000
+  refresh-expiration: 1209600000    
+
+portone:
+  base-url: "https://api.portone.io"
+  api-secret: "HTJhvpyNwCCg6yDvIKcYXIt2Jjd48YZhCscd4bKCUg0WjaeKq4h20QOKQRDiopxKQF1OZj2mKEF0ce0V"
+  store-id: "store-5f6eef50-0c96-4656-9cc8-a459a4dbc571"
+  channel-key: "channel-key-77a64cb4-edeb-4269-a966-eabd94ab9cf9"
+  webhook-secret: "whsec_skmyhcHooXQsRUa1bUHRP1H9r6PJU2ztVv+aQTCBtGM="
 
 aws:
   s3:
