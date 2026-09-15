@@ -5,19 +5,16 @@ import { confirmPayment } from "../../api/payment";
 import { getMyProfile } from "../../api/member";
 import type { Product } from "../../catalog";
 import { C, krw } from "../../lib/theme";
-import { FREE_SHIPPING_OVER, SHIPPING_FEE } from "../../lib/shipping";
 import { Field } from "../common/Field";
 import { OrderSummaryHeader } from "../common/OrderSummaryHeader";
 import { PageTitle } from "../common/PageTitle";
 import { Spinner } from "../common/Spinner";
 import { SummaryRow } from "../common/SummaryRow";
 
-/* ─── checkout ───────────────────────────────────────────── */
 export function CheckoutView({
                                lines, cartItemIds, onBack, onDone,
                              }: {
   lines: { p: Product; qty: number }[];
-  /* 주문 생성 API에 보낼 장바구니 항목 ID */
   cartItemIds: number[];
   onBack: () => void;
   onDone: (orderNo: string, total: number) => void;
@@ -27,16 +24,13 @@ export function CheckoutView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  /* 결제창 호출에 필요한 구매자 이메일 — 로그인한 회원 정보에서 가져온다 */
   useEffect(() => {
     getMyProfile()
         .then((profile) => setEmail(profile.email))
         .catch(() => setError("회원 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요."));
   }, []);
 
-  const itemsTotal = lines.reduce((sum, l) => sum + l.p.price * l.qty, 0);
-  const shipping = itemsTotal >= FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
-  const total = itemsTotal + shipping;
+  const total = lines.reduce((sum, l) => sum + l.p.price * l.qty, 0);
 
   const set = (k: keyof Receiver) => (v: string) => setR((prev) => ({ ...prev, [k]: v }));
 
@@ -57,17 +51,14 @@ export function CheckoutView({
     setBusy(true);
     setError("");
     try {
-      // 1. 주문 생성 (이 시점에 서버가 Payment까지 이미 만들어둠)
       const order = await createOrder({
         cartItemIds,
         receiverName: r.name.trim(),
         receiverPhone: r.phone.trim(),
-        /* 백엔드는 주소를 한 필드로 받으므로 우편번호 · 주소 · 상세 주소를 이어 붙인다 */
         deliveryAddress: [r.postcode, r.address, r.detail].map((v) => v.trim()).filter(Boolean).join(" "),
         deliveryRequest: r.memo.trim() || undefined,
       });
 
-      // 2. 포트원 결제창 호출 - portonePaymentId를 그대로 사용
       const orderName = lines.length > 1
           ? `${lines[0].p.name} 외 ${lines.length - 1}건`
           : lines[0].p.name;
@@ -88,17 +79,14 @@ export function CheckoutView({
       });
 
       if (!payment || payment.code != null) {
-        // 결제창 자체에서 실패/취소된 경우, 또는 사용자가 결제창을 그냥 닫은 경우
         throw new Error(payment?.message ?? "결제가 취소되었습니다.");
       }
 
-      // 3. 서버 승인 요청 (결과와 무관하게 항상 호출 - 서버가 PortOne API 재조회로 최종 검증)
       await confirmPayment({
         orderId: order.orderId,
         portonePaymentId: order.portonePaymentId,
       });
 
-      /* 완료 화면에는 서버가 확정한 주문번호와 금액을 쓴다 */
       onDone(order.orderNumber, order.totalAmount);
     } catch (error) {
       setBusy(false);
@@ -119,7 +107,6 @@ export function CheckoutView({
         <PageTitle note="// 배송 정보를 입력해 주세요">Checkout</PageTitle>
 
         <form onSubmit={submit} className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* 배송 정보 */}
           <div className="flex-1 w-full p-6" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
             <div className="text-[10px] uppercase tracking-widest mb-5" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
               // 배송지
@@ -156,7 +143,6 @@ export function CheckoutView({
             </div>
           </div>
 
-          {/* 주문 요약 */}
           <div className="w-full lg:w-80 shrink-0 p-5" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
             <OrderSummaryHeader itemCount={lines.length} />
 
@@ -173,8 +159,7 @@ export function CheckoutView({
               ))}
             </div>
 
-            <SummaryRow label="상품 합계" value={krw(itemsTotal)} />
-            <SummaryRow label="배송비" value={shipping === 0 ? "무료" : krw(shipping)} />
+            <SummaryRow label="상품 합계" value={krw(total)} />
 
             <div className="flex justify-between items-baseline py-3 mt-2" style={{ borderTop: `1px solid ${C.panelBorder}` }}>
             <span className="text-xs uppercase tracking-widest" style={{ color: C.text, fontFamily: "Share Tech Mono" }}>

@@ -316,19 +316,38 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         setReviewView("write");
     }
 
-    function openEdit(review: WrittenReview) {
-        setSection("reviews");
-        setSelected({
-            productCode: review.productCode ?? `상품 #${review.productId}`,
-            productName: review.productName ?? "작성한 리뷰",
-            purchasedAt: review.createdAt,
-        });
-        setEditingReviewId(review.reviewId);
-        setRating(review.rating);
-        setContent(review.content);
-        setError("");
-        setReviewView("edit");
-    }
+   function openEdit(review: WrittenReview) {
+  setSection("reviews");
+
+  setSelected({
+    productCode: review.productCode ?? `상품 #${review.productId}`,
+    productName: review.productName ?? "작성한 리뷰",
+    purchasedAt: review.createdAt,
+  });
+
+  setEditingReviewId(review.reviewId);
+  setRating(review.rating);
+  setContent(review.content);
+  setError("");
+  setReviewView("edit");
+}
+
+function openWriteFromOrder(
+  order: OrderData,
+  item: OrderItemData,
+) {
+  // 주문내역에서 리뷰 작성 버튼을 누르면 리뷰 관리 화면으로 이동한다.
+  setSection("reviews");
+  setTab("pending");
+
+  openWrite({
+    orderItemId: item.orderItemId,
+    productCode: item.productCode ?? "",
+    productName: item.productName,
+    purchasedAt: order.orderedAt ?? "",
+    imageUrl: item.imageUrl,
+  });
+}
 
     function openReviewManagement() {
         // 한 주문에 여러 상품이 있을 수 있으므로 특정 상품을 바로 열지 않고

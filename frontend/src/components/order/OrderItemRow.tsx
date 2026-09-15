@@ -3,9 +3,6 @@ import type { OrderItemData } from "../../api/orders";
 import { C, krw } from "../../lib/theme";
 import { TierBadge } from "../member/TierBadge";
 
-/* ─── 주문 상품 한 줄 ─────────────────────────────────────── */
-/* 주문내역 카드와 주문 상세에서 같이 쓴다. 가격은 결제 당시 스냅샷(unitPrice)이다.
-   action 에는 오른쪽 칸(리뷰 버튼)을 넣는다. null 을 넘기면 칸만 비워서 줄 정렬을 맞춘다. */
 export function OrderItemRow({ item, action }: { item: OrderItemData; action?: ReactNode }) {
   return (
     <div className="flex flex-wrap md:flex-nowrap items-center gap-4 py-4">
@@ -40,7 +37,6 @@ export function OrderItemRow({ item, action }: { item: OrderItemData; action?: R
   );
 }
 
-/* 이미지가 없으면 빈 칸에 X 를 그려 자리만 잡는다 */
 function Thumbnail({ src, alt }: { src?: string; alt: string }) {
   return (
     <div className="w-14 h-14 shrink-0 overflow-hidden" style={{ background: "#060606", border: `1px solid ${C.panelBorder}` }}>
