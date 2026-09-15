@@ -14,7 +14,9 @@ public interface  PaymentRepositoryCustom {
 
     Optional<Payment> findByPortonePaymentId(String portonePaymentId);
 
-    Optional<Payment> findByOrderIdWithOrder(Long orderId);
+    Optional<PaymentWithItems> findByPortonePaymentIdWithItem(String portonePaymentId);
+
+    Optional<PaymentWithItems> findByOrderIdWithOrder(Long orderId);
 
     Optional<Payment> findByIdWithOrder(Long paymentId);
 
@@ -24,6 +26,6 @@ public interface  PaymentRepositoryCustom {
 
     Optional<Payment> findByIdForRefundLockOnly(Long paymentId);
 
-    Optional<Payment> findByOrderIdWithOrderForUpdate(Long orderId);
+    Optional<PaymentWithItems> findByOrderIdWithOrderForUpdate(Long orderId);
 
 }

@@ -1,30 +1,34 @@
 package org.example.murderhelp.domain.chat.service;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
-import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
 import org.example.murderhelp.domain.chat.repository.ChatRoomRepository;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
 import org.example.murderhelp.domain.member.entity.Member;
 import org.example.murderhelp.domain.member.service.MemberService;
+import org.springframework.context.ApplicationEventPublisher;
+import org.example.murderhelp.domain.chat.event.ChatRoomUpdatedEvent;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ChatRoomService {
 
-    private final ChatRoomRepository chatRoomRepository;
-    private final ChatRedisPublisher chatRedisPublisher;
     private final MemberService memberService;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final StringRedisTemplate redisTemplate;
 
     @Transactional
     public ChatRoomResponse createRoom(Long memberId) {
@@ -48,23 +52,46 @@ public class ChatRoomService {
                 .build();
         
         chatRoomRepository.save(room);
-        ChatRoomResponse response = ChatRoomResponse.from(room);
-        // Redis Pub/Sub을 통해 관리자 대시보드로 브로드캐스트
-        chatRedisPublisher.publishRoomUpdate(response);
+        eventPublisher.publishEvent(ChatRoomUpdatedEvent.from(room));
 
-        return response;
+        return ChatRoomResponse.from(room, null);
     }
 
-    public Page<ChatRoomResponse> getRooms(Long customerId, ChatRoomStatus status, Pageable pageable) {
-        return chatRoomRepository.findRoomsByCondition(customerId, status, pageable)
-                .map(ChatRoomResponse::from);
+    @Transactional
+    public void closeRoom(Long roomId) {
+        ChatRoom room = getRoomEntity(roomId);
+        room.closeRoom();
+
+        eventPublisher.publishEvent(ChatRoomUpdatedEvent.from(room));
     }
+
+ 
+    public Page<ChatRoomResponse> getRooms(Long customerId, ChatRoomStatus status, String keyword, Pageable pageable) {
+        Page<ChatRoom> roomPage = chatRoomRepository.findRoomsByCondition(customerId, status, keyword, pageable);
+        List<String> roomIds = roomPage.stream()
+                                       .map(room -> room.getId().toString())
+                                       .collect(Collectors.toList());
+
+        List<Object> lastMessages = List.of();
+        if (!roomIds.isEmpty()) {
+            lastMessages = redisTemplate.opsForHash().multiGet("chat_last_messages", (List<Object>)(List<?>) roomIds);
+        }
+
+        List<Object> finalLastMessages = lastMessages;
+        return roomPage.map(room -> {
+            int index = roomIds.indexOf(room.getId().toString());
+            String lastMsg = (finalLastMessages != null && index >= 0 && index < finalLastMessages.size()) 
+                    ? (String) finalLastMessages.get(index) 
+                    : null;
+            return ChatRoomResponse.from(room, lastMsg);
+        });
+    }
+
 
     public ChatRoomResponse getRoom(Long roomId) {
         return ChatRoomResponse.from(getRoomEntity(roomId));
     }
 
-    // 서비스 간 내부 호출용 엔티티 반환 메서드
     public ChatRoom getRoomEntity(Long roomId) {
         return chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
@@ -75,14 +102,4 @@ public class ChatRoomService {
         chatRoomRepository.updateLastMessageTime(roomId);
     }
 
-    @Transactional
-    public void closeRoom(Long roomId) {
-        ChatRoom room = getRoomEntity(roomId);
-        room.closeRoom(); 
-        
-        ChatRoomResponse response = ChatRoomResponse.from(room);
-
-        // Redis Pub/Sub을 통해 관리자 대시보드로 상태 변경 브로드캐스트
-        chatRedisPublisher.publishRoomUpdate(response);
-    }
 }

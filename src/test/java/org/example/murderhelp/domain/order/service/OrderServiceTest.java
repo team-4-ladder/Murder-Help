@@ -4,7 +4,6 @@ import org.example.murderhelp.domain.cart.dto.CartItemResponse;
 import org.example.murderhelp.domain.member.entity.Member;
 import org.example.murderhelp.domain.member.repository.MemberRepository;
 import org.example.murderhelp.domain.order.dto.CreateOrderRequest;
-import org.example.murderhelp.domain.order.dto.CreateOrderResponse;
 import org.example.murderhelp.domain.order.dto.OrderListPeriod;
 import org.example.murderhelp.domain.order.dto.OrderListRequest;
 import org.example.murderhelp.domain.order.dto.OrderResponse;
@@ -13,6 +12,7 @@ import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
 import org.example.murderhelp.domain.order.repository.OrderItemRepository;
 import org.example.murderhelp.domain.order.repository.OrderRepository;
+import org.example.murderhelp.domain.payment.repository.PaymentRepository;
 import org.example.murderhelp.domain.product.entity.Product;
 import org.example.murderhelp.domain.review.repository.ReviewRepository;
 import org.example.murderhelp.global.error.BusinessException;
@@ -66,6 +66,9 @@ class OrderServiceTest {
 
     @Mock
     private ReviewRepository reviewRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
 
     @Captor
     private ArgumentCaptor<Order> orderCaptor;
@@ -126,6 +129,8 @@ class OrderServiceTest {
                 .thenReturn(new PageImpl<>(List.of(order1, order2), pageable, 2));
         when(orderItemRepository.findAllByOrderIdIn(List.of(10L, 20L)))
                 .thenReturn(List.of(orderItem1, orderItem2));
+        when(paymentRepository.findIdsByOrderIds(List.of(10L, 20L)))
+                .thenReturn(List.of());
 
         // when
         Page<OrderResponse> result = orderService.getOrderList(1L, request, pageable);
@@ -213,16 +218,18 @@ class OrderServiceTest {
         when(memberRepository.getReferenceById(1L)).thenReturn(member);
 
         // when
-        CreateOrderResponse response = orderService.createOrder(1L, request, cartItemList, productMap);
+        Order createdOrder = orderService.createOrder(1L, request, cartItemList, productMap);
 
         // then
         // 100,000원 x 1개 + 30,000원 x 3개
-        assertThat(response.totalAmount()).isEqualTo(190_000L);
-        assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(response.orderNumber()).matches("ORD-\\d{14}-[0-9A-F]{8}");
+        assertThat(createdOrder.getTotalAmount()).isEqualTo(190_000L);
+        assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(createdOrder.getOrderNumber()).matches("ORD-\\d{14}-[0-9A-F]{8}");
 
         verify(orderRepository).save(orderCaptor.capture());
         Order savedOrder = orderCaptor.getValue();
+        // 저장한 주문을 그대로 반환해야 facade 에서 결제를 만들 수 있다
+        assertThat(createdOrder).isSameAs(savedOrder);
         assertThat(savedOrder.getMember()).isSameAs(member);
         assertThat(savedOrder.getReceiverName()).isEqualTo("홍길동");
         assertThat(savedOrder.getDeliveryRequest()).isEqualTo("문 앞에 놔주세요");

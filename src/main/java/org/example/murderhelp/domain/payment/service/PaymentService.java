@@ -24,7 +24,7 @@ public class PaymentService {
 
     // 결제 생성 — pgAmount는 Payment 생성자가 스스로 계산
     @Transactional
-    public Payment createPayment(Order order, int amount) {
+    public Payment createPayment(Order order, Long amount) {
         Payment payment = Payment.builder()
                 .order(order)
                 .amount(amount)
@@ -32,12 +32,12 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
-    public Payment findByOrderIdWithOrder(Long orderId) {
+    public PaymentWithItems findByOrderIdWithOrder(Long orderId) {
         return paymentRepository.findByOrderIdWithOrder(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
-    public Payment findByOrderId(Long orderId) {
+    public PaymentWithItems findByOrderId(Long orderId) {
         return findByOrderIdWithOrder(orderId);
     }
 
@@ -59,6 +59,11 @@ public class PaymentService {
 
         // 2. 락 없이 순수하게 연관 데이터 통째로 조회 (N+1 방지)
         return paymentRepository.findByIdWithOrderAndItems(paymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+    }
+
+    public PaymentWithItems findByPortonePaymentIdWithItem(String portonePaymentId) {
+        return paymentRepository.findByPortonePaymentIdWithItem(portonePaymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
@@ -92,7 +97,7 @@ public class PaymentService {
                 .collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p));
     }
 
-    public Payment findByOrderIdWithOrderForUpdate(Long orderId) {
+    public PaymentWithItems findByOrderIdWithOrderForUpdate(Long orderId) {
         return paymentRepository.findByOrderIdWithOrderForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }

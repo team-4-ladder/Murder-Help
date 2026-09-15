@@ -59,18 +59,39 @@ public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
                 .join(payment.order, order).fetchJoin()
                 .where(payment.portonePaymentId.eq(portonePaymentId))
                 .fetchOne();
+
         return Optional.ofNullable(result);
+    }
+
+    @Override
+    public Optional<PaymentWithItems> findByPortonePaymentIdWithItem(String portonePaymentId) {
+        Payment result = queryFactory
+                .selectFrom(payment)
+                .join(payment.order, order).fetchJoin()
+                .where(payment.portonePaymentId.eq(portonePaymentId))
+                .fetchOne();
+
+        return Optional.ofNullable(result).map(this::toPaymentWithItems);
+    }
+
+    private PaymentWithItems toPaymentWithItems(Payment payment) {
+        List<OrderItem> items = queryFactory
+                .selectFrom(orderItem)
+                .where(orderItem.order.eq(payment.getOrder()))
+                .fetch();
+        return new PaymentWithItems(payment, items);
     }
 
     // 결제 확정 - orderId 기준 조회 (Order fetch join)
     @Override
-    public Optional<Payment> findByOrderIdWithOrder(Long orderId) {
+    public Optional<PaymentWithItems> findByOrderIdWithOrder(Long orderId) {
         Payment result = queryFactory
                 .selectFrom(payment)
                 .join(payment.order, order).fetchJoin()
                 .where(payment.order.id.eq(orderId))
                 .fetchOne();
-        return Optional.ofNullable(result);
+
+        return Optional.ofNullable(result).map(this::toPaymentWithItems);
     }
 
     // 결제 상세 조회 - paymentId 기준 (Order fetch join)
@@ -93,16 +114,7 @@ public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
                 .where(payment.id.eq(paymentId))
                 .fetchOne();
 
-        if (result == null) {
-            return Optional.empty();
-        }
-
-        List<OrderItem> items = queryFactory
-                .selectFrom(orderItem)
-                .where(orderItem.order.eq(result.getOrder()))
-                .fetch();
-
-        return Optional.of(new PaymentWithItems(result, items));
+        return Optional.ofNullable(result).map(this::toPaymentWithItems);
     }
 
     @Override
@@ -126,14 +138,15 @@ public class PaymentRepositoryCustomImpl implements PaymentRepositoryCustom {
     }
 
     @Override
-    public Optional<Payment> findByOrderIdWithOrderForUpdate(Long orderId) {
+    public Optional<PaymentWithItems> findByOrderIdWithOrderForUpdate(Long orderId) {
         Payment result = queryFactory
                 .selectFrom(payment)
                 .join(payment.order, order).fetchJoin()
                 .where(payment.order.id.eq(orderId))
                 .setLockMode(LockModeType.PESSIMISTIC_WRITE)
                 .fetchOne();
-        return Optional.ofNullable(result);
+
+        return Optional.ofNullable(result).map(this::toPaymentWithItems);
     }
 
 }
