@@ -4,10 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
 import org.example.murderhelp.domain.order.repository.OrderItemRepository;
-import org.example.murderhelp.domain.review.dto.PendingReviewResponse;
-import org.example.murderhelp.domain.review.dto.ReviewCreateRequest;
-import org.example.murderhelp.domain.review.dto.ReviewResponse;
-import org.example.murderhelp.domain.review.dto.ReviewUpdateRequest;
+import org.example.murderhelp.domain.review.dto.*;
 import org.example.murderhelp.domain.review.entity.Review;
 import org.example.murderhelp.domain.review.repository.ReviewQueryRepository;
 import org.example.murderhelp.domain.review.repository.ReviewRepository;
@@ -43,11 +40,8 @@ public class ReviewService {
     /**
      * 로그인 회원이 작성한 리뷰 조회
      */
-    public List<ReviewResponse> getMyReviews(Long memberId) {
-        return reviewRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
-                .stream()
-                .map(ReviewResponse::from)
-                .toList();
+    public List<MyReviewResponse> getMyReviews(Long memberId) {
+        return reviewQueryRepository.findMyReviews(memberId);
     }
 
     /**
