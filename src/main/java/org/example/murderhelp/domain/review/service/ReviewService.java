@@ -51,6 +51,17 @@ public class ReviewService {
     }
 
     /**
+     * 특정 상품에 등록된 리뷰를 최신순으로 조회한다.
+     */
+    public List<ReviewResponse> getProductReviews(Long productId) {
+        return reviewRepository
+                .findAllByProductIdOrderByCreatedAtDesc(productId)
+                .stream()
+                .map(ReviewResponse::from)
+                .toList();
+    }
+
+    /**
      * 리뷰 작성
      */
     @Transactional
