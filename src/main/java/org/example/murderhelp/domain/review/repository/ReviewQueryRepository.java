@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
+import org.example.murderhelp.domain.review.dto.MyReviewResponse;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,6 +32,28 @@ public class ReviewQueryRepository {
                         """, OrderItem.class)
                 .setParameter("memberId", memberId)
                 .setParameter("status", OrderStatus.DELIVERED)
+                .getResultList();
+    }
+
+    public List<MyReviewResponse> findMyReviews(Long memberId) {
+        return entityManager.createQuery("""
+            SELECT new org.example.murderhelp.domain.review.dto.MyReviewResponse(
+                r.id,
+                r.orderItemId,
+                r.productId,
+                p.productCode,
+                p.name,
+                r.rating,
+                r.content,
+                r.createdAt,
+                r.updatedAt
+            )
+            FROM Review r, Product p
+            WHERE r.memberId = :memberId
+              AND p.id = r.productId
+            ORDER BY r.createdAt DESC
+            """, MyReviewResponse.class)
+                .setParameter("memberId", memberId)
                 .getResultList();
     }
 }

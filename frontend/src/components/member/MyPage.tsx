@@ -42,12 +42,14 @@ type ReviewTarget = Omit<PendingReview, "orderItemId"> & {
 
 type WrittenReview = {
     reviewId: number;
+    orderItemId: number;
     productId: number;
-    productCode?: string;
-    productName?: string;
+    productCode: string;
+    productName: string;
     rating: number;
     content: string;
     createdAt: string;
+    updatedAt: string;
 };
 
 async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -767,7 +769,7 @@ function openWriteFromOrder(
 
                     {section === "reviews" && reviewView === "list" && (
                         <>
-                            <PageTitle note="// 구매 확정 상품의 리뷰를 작성하고 관리합니다">
+                            <PageTitle>
                                 My Review Management
                             </PageTitle>
 
@@ -894,12 +896,14 @@ function openWriteFromOrder(
                                             }}
                                         >
                                             <div className="flex-1">
-                                                <div style={{ color: C.text }}>
-                                                    {"★".repeat(review.rating)}{" "}
-                                                    <span style={{ color: C.textMuted }}>
-                                                        {review.productCode ??
-                                                            `상품 #${review.productId}`}
-                                                    </span>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  <span style={{color: C.redBright, letterSpacing: 2,}}>
+                                                    {"★".repeat(review.rating)}
+                                                  </span>
+                                                    <span
+                                                        style={{color: C.text, fontFamily: "Noto Sans KR, sans-serif",}}>
+                                                    {review.productName}
+                                                  </span>
                                                 </div>
 
                                                 <p

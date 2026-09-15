@@ -6,6 +6,7 @@ import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
 import org.example.murderhelp.domain.order.repository.OrderItemRepository;
 import org.example.murderhelp.domain.product.entity.Product;
+import org.example.murderhelp.domain.review.dto.MyReviewResponse;
 import org.example.murderhelp.domain.review.dto.PendingReviewResponse;
 import org.example.murderhelp.domain.review.dto.ReviewCreateRequest;
 import org.example.murderhelp.domain.review.dto.ReviewResponse;
@@ -25,13 +26,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
@@ -56,15 +61,26 @@ class ReviewServiceTest {
     void getPendingReviews() {
         // given
         OrderItem orderItem =
-                createOrderItem(10L, 1L, OrderStatus.DELIVERED);
+                createOrderItem(
+                        10L,
+                        1L,
+                        OrderStatus.DELIVERED
+                );
 
         Product product = orderItem.getProduct();
 
-        when(product.getProductCode()).thenReturn("TEST-001");
-        when(product.getImageUrl()).thenReturn("https://example.com/product.png");
+        when(product.getProductCode())
+                .thenReturn("P001");
 
-        when(reviewQueryRepository.findPendingReviewItems(1L))
-                .thenReturn(List.of(orderItem));
+        when(product.getImageUrl())
+                .thenReturn(
+                        "https://example.com/product.png"
+                );
+
+        when(
+                reviewQueryRepository
+                        .findPendingReviewItems(1L)
+        ).thenReturn(List.of(orderItem));
 
         // when
         List<PendingReviewResponse> result =
@@ -72,18 +88,93 @@ class ReviewServiceTest {
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).orderItemId()).isEqualTo(10L);
-        assertThat(result.get(0).productCode()).isEqualTo("TEST-001");
-        assertThat(result.get(0).productName()).isEqualTo("리뷰 테스트 상품");
-        assertThat(result.get(0).imageUrl())
-                .isEqualTo("https://example.com/product.png");
 
-        verify(reviewQueryRepository).findPendingReviewItems(1L);
+        assertThat(result.get(0).orderItemId())
+                .isEqualTo(10L);
+
+        assertThat(result.get(0).productCode())
+                .isEqualTo("P001");
+
+        assertThat(result.get(0).productName())
+                .isEqualTo("리뷰 테스트 상품");
+
+        assertThat(result.get(0).imageUrl())
+                .isEqualTo(
+                        "https://example.com/product.png"
+                );
+
+        verify(reviewQueryRepository)
+                .findPendingReviewItems(1L);
     }
 
     @Test
-    @DisplayName("내가 작성한 리뷰 목록을 최신순으로 조회한다")
+    @DisplayName("내가 작성한 리뷰를 상품 정보와 함께 최신순으로 조회한다")
     void getMyReviews() {
+        // given
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        15,
+                        21,
+                        0
+                );
+
+        MyReviewResponse review =
+                new MyReviewResponse(
+                        100L,
+                        10L,
+                        1L,
+                        "P001",
+                        "리뷰 테스트 상품",
+                        5,
+                        "좋은 상품입니다.",
+                        now,
+                        now
+                );
+
+        when(reviewQueryRepository.findMyReviews(1L))
+                .thenReturn(List.of(review));
+
+        // when
+        List<MyReviewResponse> result =
+                reviewService.getMyReviews(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+
+        assertThat(result.get(0).reviewId())
+                .isEqualTo(100L);
+
+        assertThat(result.get(0).productId())
+                .isEqualTo(1L);
+
+        assertThat(result.get(0).productCode())
+                .isEqualTo("P001");
+
+        assertThat(result.get(0).productName())
+                .isEqualTo("리뷰 테스트 상품");
+
+        assertThat(result.get(0).rating())
+                .isEqualTo(5);
+
+        assertThat(result.get(0).content())
+                .isEqualTo("좋은 상품입니다.");
+
+        verify(reviewQueryRepository)
+                .findMyReviews(1L);
+
+        verify(
+                reviewRepository,
+                never()
+        ).findAllByMemberIdOrderByCreatedAtDesc(
+                anyLong()
+        );
+    }
+
+    @Test
+    @DisplayName("특정 상품에 등록된 리뷰를 최신순으로 조회한다")
+    void getProductReviews() {
         // given
         Review review = createReview(
                 100L,
@@ -91,23 +182,39 @@ class ReviewServiceTest {
                 1L,
                 1L,
                 5,
-                "좋은 상품입니다."
+                "상품 상세 리뷰입니다."
         );
 
-        when(reviewRepository.findAllByMemberIdOrderByCreatedAtDesc(1L))
-                .thenReturn(List.of(review));
+        when(
+                reviewRepository
+                        .findAllByProductIdOrderByCreatedAtDesc(
+                                1L
+                        )
+        ).thenReturn(List.of(review));
 
         // when
         List<ReviewResponse> result =
-                reviewService.getMyReviews(1L);
+                reviewService.getProductReviews(1L);
 
         // then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).reviewId()).isEqualTo(100L);
-        assertThat(result.get(0).content()).isEqualTo("좋은 상품입니다.");
+
+        assertThat(result.get(0).reviewId())
+                .isEqualTo(100L);
+
+        assertThat(result.get(0).productId())
+                .isEqualTo(1L);
+
+        assertThat(result.get(0).rating())
+                .isEqualTo(5);
+
+        assertThat(result.get(0).content())
+                .isEqualTo("상품 상세 리뷰입니다.");
 
         verify(reviewRepository)
-                .findAllByMemberIdOrderByCreatedAtDesc(1L);
+                .findAllByProductIdOrderByCreatedAtDesc(
+                        1L
+                );
     }
 
     @Test
@@ -115,47 +222,94 @@ class ReviewServiceTest {
     void createReview() {
         // given
         OrderItem orderItem =
-                createOrderItem(10L, 1L, OrderStatus.DELIVERED);
+                createOrderItem(
+                        10L,
+                        1L,
+                        OrderStatus.DELIVERED
+                );
+
+        /*
+         * 정상 작성 과정에서만 상품 ID가 필요하다.
+         * 실패 테스트에서는 이 스텁이 필요하지 않으므로
+         * 공통 픽스처가 아닌 이 테스트에만 작성한다.
+         */
+        when(orderItem.getProduct().getId())
+                .thenReturn(1L);
 
         when(orderItemRepository.findById(10L))
                 .thenReturn(Optional.of(orderItem));
 
-        when(reviewRepository.existsByOrderItemId(10L))
-                .thenReturn(false);
+        when(
+                reviewRepository
+                        .existsByOrderItemId(10L)
+        ).thenReturn(false);
 
-        when(reviewRepository.save(any(Review.class)))
-                .thenAnswer(invocation -> {
-                    Review review = invocation.getArgument(0);
-                    ReflectionTestUtils.setField(review, "id", 100L);
-                    return review;
-                });
+        when(
+                reviewRepository.save(
+                        any(Review.class)
+                )
+        ).thenAnswer(invocation -> {
+            Review review =
+                    invocation.getArgument(0);
 
-        ReviewCreateRequest request = new ReviewCreateRequest(
-                10L,
-                5,
-                "배송도 빠르고 상품도 좋습니다."
-        );
+            ReflectionTestUtils.setField(
+                    review,
+                    "id",
+                    100L
+            );
+
+            return review;
+        });
+
+        ReviewCreateRequest request =
+                new ReviewCreateRequest(
+                        10L,
+                        5,
+                        "배송도 빠르고 상품도 좋습니다."
+                );
 
         // when
         ReviewResponse result =
-                reviewService.createReview(1L, request);
+                reviewService.createReview(
+                        1L,
+                        request
+                );
 
         // then
-        assertThat(result.reviewId()).isEqualTo(100L);
-        assertThat(result.orderItemId()).isEqualTo(10L);
-        assertThat(result.productId()).isEqualTo(1L);
-        assertThat(result.rating()).isEqualTo(5);
+        assertThat(result.reviewId())
+                .isEqualTo(100L);
+
+        assertThat(result.orderItemId())
+                .isEqualTo(10L);
+
+        assertThat(result.productId())
+                .isEqualTo(1L);
+
+        assertThat(result.rating())
+                .isEqualTo(5);
+
         assertThat(result.content())
-                .isEqualTo("배송도 빠르고 상품도 좋습니다.");
+                .isEqualTo(
+                        "배송도 빠르고 상품도 좋습니다."
+                );
 
-        verify(reviewRepository).save(reviewCaptor.capture());
+        verify(reviewRepository)
+                .save(reviewCaptor.capture());
 
-        Review savedReview = reviewCaptor.getValue();
+        Review savedReview =
+                reviewCaptor.getValue();
 
-        assertThat(savedReview.getOrderItemId()).isEqualTo(10L);
-        assertThat(savedReview.getProductId()).isEqualTo(1L);
-        assertThat(savedReview.getMemberId()).isEqualTo(1L);
-        assertThat(savedReview.getRating()).isEqualTo(5);
+        assertThat(savedReview.getOrderItemId())
+                .isEqualTo(10L);
+
+        assertThat(savedReview.getProductId())
+                .isEqualTo(1L);
+
+        assertThat(savedReview.getMemberId())
+                .isEqualTo(1L);
+
+        assertThat(savedReview.getRating())
+                .isEqualTo(5);
     }
 
     @Test
@@ -163,27 +317,44 @@ class ReviewServiceTest {
     void createReviewFailsForAnotherMembersOrder() {
         // given
         OrderItem orderItem =
-                createOrderItem(10L, 2L, OrderStatus.DELIVERED);
+                createOrderItem(
+                        10L,
+                        2L,
+                        OrderStatus.DELIVERED
+                );
 
         when(orderItemRepository.findById(10L))
                 .thenReturn(Optional.of(orderItem));
 
         ReviewCreateRequest request =
-                new ReviewCreateRequest(10L, 5, "권한 없는 리뷰 작성");
+                new ReviewCreateRequest(
+                        10L,
+                        5,
+                        "권한 없는 리뷰 작성"
+                );
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.createReview(1L, request)
+                reviewService.createReview(
+                        1L,
+                        request
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
 
-        verify(reviewRepository, never())
-                .existsByOrderItemId(anyLong());
+        verify(
+                reviewRepository,
+                never()
+        ).existsByOrderItemId(anyLong());
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
     }
 
     @Test
@@ -191,27 +362,46 @@ class ReviewServiceTest {
     void createReviewFailsWhenOrderIsNotDelivered() {
         // given
         OrderItem orderItem =
-                createOrderItem(10L, 1L, OrderStatus.SHIPPING);
+                createOrderItem(
+                        10L,
+                        1L,
+                        OrderStatus.SHIPPING
+                );
 
         when(orderItemRepository.findById(10L))
                 .thenReturn(Optional.of(orderItem));
 
         ReviewCreateRequest request =
-                new ReviewCreateRequest(10L, 5, "배송 중 리뷰 작성");
+                new ReviewCreateRequest(
+                        10L,
+                        5,
+                        "배송 중 리뷰 작성"
+                );
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.createReview(1L, request)
+                reviewService.createReview(
+                        1L,
+                        request
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                .isEqualTo(
+                        ErrorCode.INVALID_INPUT_VALUE
+                );
 
-        verify(reviewRepository, never())
-                .existsByOrderItemId(anyLong());
+        verify(
+                reviewRepository,
+                never()
+        ).existsByOrderItemId(anyLong());
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
     }
 
     @Test
@@ -219,27 +409,46 @@ class ReviewServiceTest {
     void createReviewFailsWhenReviewAlreadyExists() {
         // given
         OrderItem orderItem =
-                createOrderItem(10L, 1L, OrderStatus.DELIVERED);
+                createOrderItem(
+                        10L,
+                        1L,
+                        OrderStatus.DELIVERED
+                );
 
         when(orderItemRepository.findById(10L))
                 .thenReturn(Optional.of(orderItem));
 
-        when(reviewRepository.existsByOrderItemId(10L))
-                .thenReturn(true);
+        when(
+                reviewRepository
+                        .existsByOrderItemId(10L)
+        ).thenReturn(true);
 
         ReviewCreateRequest request =
-                new ReviewCreateRequest(10L, 5, "중복 리뷰 작성");
+                new ReviewCreateRequest(
+                        10L,
+                        5,
+                        "중복 리뷰 작성"
+                );
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.createReview(1L, request)
+                reviewService.createReview(
+                        1L,
+                        request
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                .isEqualTo(
+                        ErrorCode.INVALID_INPUT_VALUE
+                );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
     }
 
     @Test
@@ -250,18 +459,31 @@ class ReviewServiceTest {
                 .thenReturn(Optional.empty());
 
         ReviewCreateRequest request =
-                new ReviewCreateRequest(999L, 5, "리뷰 작성");
+                new ReviewCreateRequest(
+                        999L,
+                        5,
+                        "리뷰 작성"
+                );
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.createReview(1L, request)
+                reviewService.createReview(
+                        1L,
+                        request
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.ORDER_NOT_FOUND);
+                .isEqualTo(
+                        ErrorCode.ORDER_NOT_FOUND
+                );
 
-        verify(reviewRepository, never())
-                .save(any(Review.class));
+        verify(
+                reviewRepository,
+                never()
+        ).save(any(Review.class));
     }
 
     @Test
@@ -281,15 +503,25 @@ class ReviewServiceTest {
                 .thenReturn(Optional.of(review));
 
         ReviewUpdateRequest request =
-                new ReviewUpdateRequest(5, "수정 후 내용");
+                new ReviewUpdateRequest(
+                        5,
+                        "수정 후 내용"
+                );
 
         // when
         ReviewResponse result =
-                reviewService.updateReview(1L, 100L, request);
+                reviewService.updateReview(
+                        1L,
+                        100L,
+                        request
+                );
 
         // then
-        assertThat(result.rating()).isEqualTo(5);
-        assertThat(result.content()).isEqualTo("수정 후 내용");
+        assertThat(result.rating())
+                .isEqualTo(5);
+
+        assertThat(result.content())
+                .isEqualTo("수정 후 내용");
     }
 
     @Test
@@ -309,13 +541,22 @@ class ReviewServiceTest {
                 .thenReturn(Optional.of(review));
 
         ReviewUpdateRequest request =
-                new ReviewUpdateRequest(5, "수정 시도");
+                new ReviewUpdateRequest(
+                        5,
+                        "수정 시도"
+                );
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.updateReview(1L, 100L, request)
+                reviewService.updateReview(
+                        1L,
+                        100L,
+                        request
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
     }
@@ -340,7 +581,8 @@ class ReviewServiceTest {
         reviewService.deleteReview(1L, 100L);
 
         // then
-        verify(reviewRepository).delete(review);
+        verify(reviewRepository)
+                .delete(review);
     }
 
     @Test
@@ -361,13 +603,21 @@ class ReviewServiceTest {
 
         // when & then
         assertThatThrownBy(() ->
-                reviewService.deleteReview(1L, 100L)
+                reviewService.deleteReview(
+                        1L,
+                        100L
+                )
         )
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(
+                        BusinessException.class
+                )
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
 
-        verify(reviewRepository, never()).delete(any(Review.class));
+        verify(
+                reviewRepository,
+                never()
+        ).delete(any(Review.class));
     }
 
     private OrderItem createOrderItem(
@@ -376,39 +626,60 @@ class ReviewServiceTest {
             OrderStatus targetStatus
     ) {
         Member member = Member.builder()
-                .email("member" + memberId + "@test.com")
+                .email(
+                        "member"
+                                + memberId
+                                + "@test.com"
+                )
                 .password("password")
                 .name("회원")
                 .phone("010-0000-0000")
                 .build();
 
-        ReflectionTestUtils.setField(member, "id", memberId);
+        ReflectionTestUtils.setField(
+                member,
+                "id",
+                memberId
+        );
 
         Order order = Order.builder()
                 .member(member)
-                .orderNumber("ORD-TEST-" + orderItemId)
+                .orderNumber(
+                        "ORD-TEST-" + orderItemId
+                )
                 .totalAmount(15_900L)
                 .receiverName("홍길동")
                 .receiverPhone("010-0000-0000")
                 .deliveryAddress("서울시 강남구")
-                .deliveryRequest("문 앞에 놓아주세요.")
+                .deliveryRequest(
+                        "문 앞에 놓아주세요."
+                )
                 .build();
 
         moveOrderStatus(order, targetStatus);
 
-        Product product = mock(Product.class);
+        Product product = org.mockito.Mockito.mock(
+                Product.class
+        );
 
         /*
-         * 실패 테스트는 상품 ID를 읽기 전에 예외가 발생한다.
-         * 여러 테스트가 공통 픽스처를 사용하므로 이 stubbing만 lenient 처리한다.
+         * OrderItem 생성자가 상품명과 가격을 읽기 때문에
+         * 두 값은 모든 테스트에 필요하다.
          */
-        lenient().when(product.getId()).thenReturn(1L);
+        when(product.getName())
+                .thenReturn("리뷰 테스트 상품");
 
-        when(product.getName()).thenReturn("리뷰 테스트 상품");
-        when(product.getPrice()).thenReturn(15_900L);
+        when(product.getPrice())
+                .thenReturn(15_900L);
 
-        OrderItem orderItem = new OrderItem(order, product, 1);
-        ReflectionTestUtils.setField(orderItem, "id", orderItemId);
+        OrderItem orderItem =
+                new OrderItem(order, product, 1);
+
+        ReflectionTestUtils.setField(
+                orderItem,
+                "id",
+                orderItemId
+        );
 
         return orderItem;
     }
@@ -417,7 +688,10 @@ class ReviewServiceTest {
             Order order,
             OrderStatus targetStatus
     ) {
-        if (targetStatus == OrderStatus.PENDING_PAYMENT) {
+        if (
+                targetStatus
+                        == OrderStatus.PENDING_PAYMENT
+        ) {
             return;
         }
 
@@ -427,9 +701,14 @@ class ReviewServiceTest {
             return;
         }
 
-        order.transitTo(OrderStatus.PREPARING_DELIVERY);
+        order.transitTo(
+                OrderStatus.PREPARING_DELIVERY
+        );
 
-        if (targetStatus == OrderStatus.PREPARING_DELIVERY) {
+        if (
+                targetStatus
+                        == OrderStatus.PREPARING_DELIVERY
+        ) {
             return;
         }
 
@@ -458,7 +737,11 @@ class ReviewServiceTest {
                 .content(content)
                 .build();
 
-        ReflectionTestUtils.setField(review, "id", reviewId);
+        ReflectionTestUtils.setField(
+                review,
+                "id",
+                reviewId
+        );
 
         return review;
     }
