@@ -1129,8 +1129,12 @@ export default function App() {
                     <div className="text-3xl font-bold uppercase mb-2" style={{ fontFamily: "Cinzel, serif", color: C.redDim }}>
                       NO ITEMS
                     </div>
-                    <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-                      // {isSearching ? `"${searchKeyword}"` : activeSub} — {TIERS[activeCodeTab].label} 등급 아이템 없음
+                    <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Noto Sans KR, sans-serif" }}>
+                      {isSearching
+                        ? `“${searchKeyword}”에 해당하는 상품이 없습니다.`
+                        : activeSub === "전체"
+                          ? "현재 등록된 상품이 없습니다."
+                          : `${activeSub} 카테고리에 ${TIERS[activeCodeTab].label} 등급 상품이 없습니다.`}
                     </div>
                   </div>
                 ) : null}
