@@ -13,8 +13,9 @@ export const TIERS: Record<Tier, { label: string; color: string; brightColor: st
 /* ─── 등급 승급 ───────────────────────────────────────────── */
 /* 등급은 계정에 고정된 값이 아니라 누적 구매금액에서 계산된다.
    가입 직후 0원 = Code Yellow 에서 시작하고, 주문이 완료될 때마다 쌓인다. */
-export const PURPLE_AT = 200_000;
-export const RED_AT = 800_000;
+// 서버 MembershipGradePolicy 기준과 동일하게 유지
+export const PURPLE_AT = 100_000;
+export const RED_AT = 500_000;
 
 export function tierFor(spent: number, id?: string): Tier {
   if (id === "green") return "green";
