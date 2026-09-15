@@ -1,5 +1,6 @@
 package org.example.murderhelp.domain.review.controller;
 
+import org.example.murderhelp.domain.review.dto.MyReviewResponse;
 import org.example.murderhelp.domain.review.dto.PendingReviewResponse;
 import org.example.murderhelp.domain.review.dto.ReviewCreateRequest;
 import org.example.murderhelp.domain.review.dto.ReviewResponse;
@@ -39,7 +40,7 @@ class ReviewControllerTest {
         PendingReviewResponse pendingReview =
                 new PendingReviewResponse(
                         10L,
-                        "TEST-001",
+                        "P001",
                         "리뷰 테스트 상품",
                         purchasedAt,
                         "https://example.com/product.png"
@@ -53,31 +54,53 @@ class ReviewControllerTest {
                 reviewController.getPendingReviews(1L);
 
         // then
-        assertThat(result.getCode()).isEqualTo("SUCCESS");
-        assertThat(result.getData()).containsExactly(pendingReview);
+        assertThat(result.getCode())
+                .isEqualTo("SUCCESS");
 
-        verify(reviewService).getPendingReviews(1L);
+        assertThat(result.getData())
+                .containsExactly(pendingReview);
+
+        verify(reviewService)
+                .getPendingReviews(1L);
     }
 
     @Test
     @DisplayName("내 리뷰 목록 조회 요청을 서비스에 전달한다")
     void getMyReviews() {
         // given
-        ReviewResponse review =
-                reviewResponse(100L, 10L, 1L, 5, "좋은 상품입니다.");
+        MyReviewResponse review =
+                myReviewResponse(
+                        100L,
+                        10L,
+                        1L,
+                        "P001",
+                        "리뷰 테스트 상품",
+                        5,
+                        "좋은 상품입니다."
+                );
 
         when(reviewService.getMyReviews(1L))
                 .thenReturn(List.of(review));
 
         // when
-        ApiResponse<List<ReviewResponse>> result =
+        ApiResponse<List<MyReviewResponse>> result =
                 reviewController.getMyReviews(1L);
 
         // then
-        assertThat(result.getCode()).isEqualTo("SUCCESS");
-        assertThat(result.getData()).containsExactly(review);
+        assertThat(result.getCode())
+                .isEqualTo("SUCCESS");
 
-        verify(reviewService).getMyReviews(1L);
+        assertThat(result.getData())
+                .containsExactly(review);
+
+        assertThat(result.getData().get(0).productCode())
+                .isEqualTo("P001");
+
+        assertThat(result.getData().get(0).productName())
+                .isEqualTo("리뷰 테스트 상품");
+
+        verify(reviewService)
+                .getMyReviews(1L);
     }
 
     @Test
@@ -85,10 +108,20 @@ class ReviewControllerTest {
     void createReview() {
         // given
         ReviewCreateRequest request =
-                new ReviewCreateRequest(10L, 5, "리뷰 작성 테스트");
+                new ReviewCreateRequest(
+                        10L,
+                        5,
+                        "리뷰 작성 테스트"
+                );
 
         ReviewResponse response =
-                reviewResponse(100L, 10L, 1L, 5, "리뷰 작성 테스트");
+                reviewResponse(
+                        100L,
+                        10L,
+                        1L,
+                        5,
+                        "리뷰 작성 테스트"
+                );
 
         when(reviewService.createReview(1L, request))
                 .thenReturn(response);
@@ -98,10 +131,14 @@ class ReviewControllerTest {
                 reviewController.createReview(1L, request);
 
         // then
-        assertThat(result.getCode()).isEqualTo("SUCCESS");
-        assertThat(result.getData()).isEqualTo(response);
+        assertThat(result.getCode())
+                .isEqualTo("SUCCESS");
 
-        verify(reviewService).createReview(1L, request);
+        assertThat(result.getData())
+                .isEqualTo(response);
+
+        verify(reviewService)
+                .createReview(1L, request);
     }
 
     @Test
@@ -109,23 +146,40 @@ class ReviewControllerTest {
     void updateReview() {
         // given
         ReviewUpdateRequest request =
-                new ReviewUpdateRequest(4, "수정된 리뷰입니다.");
+                new ReviewUpdateRequest(
+                        4,
+                        "수정된 리뷰입니다."
+                );
 
         ReviewResponse response =
-                reviewResponse(100L, 10L, 1L, 4, "수정된 리뷰입니다.");
+                reviewResponse(
+                        100L,
+                        10L,
+                        1L,
+                        4,
+                        "수정된 리뷰입니다."
+                );
 
         when(reviewService.updateReview(1L, 100L, request))
                 .thenReturn(response);
 
         // when
         ApiResponse<ReviewResponse> result =
-                reviewController.updateReview(1L, 100L, request);
+                reviewController.updateReview(
+                        1L,
+                        100L,
+                        request
+                );
 
         // then
-        assertThat(result.getCode()).isEqualTo("SUCCESS");
-        assertThat(result.getData()).isEqualTo(response);
+        assertThat(result.getCode())
+                .isEqualTo("SUCCESS");
 
-        verify(reviewService).updateReview(1L, 100L, request);
+        assertThat(result.getData())
+                .isEqualTo(response);
+
+        verify(reviewService)
+                .updateReview(1L, 100L, request);
     }
 
     @Test
@@ -136,9 +190,35 @@ class ReviewControllerTest {
                 reviewController.deleteReview(1L, 100L);
 
         // then
-        assertThat(result.getCode()).isEqualTo("SUCCESS");
+        assertThat(result.getCode())
+                .isEqualTo("SUCCESS");
 
-        verify(reviewService).deleteReview(1L, 100L);
+        verify(reviewService)
+                .deleteReview(1L, 100L);
+    }
+
+    private MyReviewResponse myReviewResponse(
+            Long reviewId,
+            Long orderItemId,
+            Long productId,
+            String productCode,
+            String productName,
+            Integer rating,
+            String content
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        return new MyReviewResponse(
+                reviewId,
+                orderItemId,
+                productId,
+                productCode,
+                productName,
+                rating,
+                content,
+                now,
+                now
+        );
     }
 
     private ReviewResponse reviewResponse(
