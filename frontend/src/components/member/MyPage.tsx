@@ -95,7 +95,8 @@ export function MyPage({ onBack }: { onBack: () => void }) {
     /* 마이페이지 첫 진입 시 무조건 내 정보 수정 */
     const [section, setSection] = useState<Section>("profile");
     const [tab, setTab] = useState<Tab>("pending");
-    const [reviewView, setReviewView] = useState<"list" | "write">("list");
+    const [reviewView, setReviewView] = useState<"list" | "write" | "edit">("list");
+    const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
 
     const [member, setMember] = useState<MemberInfo | null>(null);
     const [name, setName] = useState("");
@@ -309,13 +310,30 @@ export function MyPage({ onBack }: { onBack: () => void }) {
 
     function openWrite(review: ReviewTarget) {
         setSelected(review);
+        setEditingReviewId(null);
         setRating(5);
         setContent("");
         setError("");
         setReviewView("write");
     }
 
+    function openEdit(review: WrittenReview) {
+        setSection("reviews");
+        setSelected({
+            productCode: review.productCode ?? `상품 #${review.productId}`,
+            productName: review.productName ?? "작성한 리뷰",
+            purchasedAt: review.createdAt,
+        });
+        setEditingReviewId(review.reviewId);
+        setRating(review.rating);
+        setContent(review.content);
+        setError("");
+        setReviewView("edit");
+    }
+
     function openWriteFromOrder(order: OrderData, item: OrderItemData) {
+        setSection("reviews");
+        setTab("pending");
         openWrite({
             orderItemId: item.orderItemId,
             productCode: item.productCode ?? "",
@@ -328,7 +346,9 @@ export function MyPage({ onBack }: { onBack: () => void }) {
     async function submitReview() {
         if (!selected) return;
 
-        if (selected.orderItemId === undefined) {
+        const isEditing = reviewView === "edit" && editingReviewId !== null;
+
+        if (!isEditing && selected.orderItemId === undefined) {
             setError("주문 상품 번호가 없어 리뷰를 등록할 수 없습니다.");
             return;
         }
@@ -339,26 +359,26 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         }
 
         try {
-            await api("/api/reviews", {
-                method: "POST",
+            await api(isEditing ? `/api/reviews/${editingReviewId}` : "/api/reviews", {
+                method: isEditing ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    orderItemId: selected.orderItemId,
-                    rating,
-                    content: content.trim(),
-                }),
+                body: JSON.stringify(
+                    isEditing
+                        ? { rating, content: content.trim() }
+                        : {
+                            orderItemId: selected.orderItemId,
+                            rating,
+                            content: content.trim(),
+                        },
+                ),
             });
 
             setSelected(null);
+            setEditingReviewId(null);
             setContent("");
             setReviewView("list");
-
-            if (section === "orders") {
-                setOrdersRefreshKey((key) => key + 1);
-                return;
-            }
 
             setTab("written");
             await loadReviews();
@@ -366,7 +386,9 @@ export function MyPage({ onBack }: { onBack: () => void }) {
             setError(
                 caughtError instanceof Error
                     ? caughtError.message
-                    : "리뷰 작성에 실패했습니다.",
+                    : isEditing
+                        ? "리뷰 수정에 실패했습니다."
+                        : "리뷰 작성에 실패했습니다.",
             );
         }
     }
@@ -876,18 +898,30 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                                                 </div>
                                             </div>
 
-                                            <button
-                                                onClick={() =>
-                                                    void deleteReview(review.reviewId)
-                                                }
-                                                className="h-fit px-3 py-1.5 text-xs"
-                                                style={{
-                                                    border: `1px solid ${C.panelBorder}`,
-                                                    color: C.textMuted,
-                                                }}
-                                            >
-                                                삭제
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => openEdit(review)}
+                                                    className="h-fit px-3 py-1.5 text-xs"
+                                                    style={{
+                                                        border: `1px solid ${C.panelBorder}`,
+                                                        color: C.text,
+                                                    }}
+                                                >
+                                                    수정
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        void deleteReview(review.reviewId)
+                                                    }
+                                                    className="h-fit px-3 py-1.5 text-xs"
+                                                    style={{
+                                                        border: `1px solid ${C.panelBorder}`,
+                                                        color: C.textMuted,
+                                                    }}
+                                                >
+                                                    삭제
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </>
@@ -895,22 +929,20 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                         </>
                     )}
 
-                    {reviewView === "write" && selected && (
+                    {(reviewView === "write" || reviewView === "edit") && selected && (
                         <>
                             <button
                                 onClick={() => setReviewView("list")}
                                 className="text-xs mb-5"
                                 style={{ color: C.textMuted }}
                             >
-                                {section === "orders"
-                                    ? "← 주문내역으로"
-                                    : "← 리뷰 목록으로"}
+                                ← 리뷰 목록으로
                             </button>
 
                             <PageTitle
-                                note={`// REVIEWS / WRITE · ${selected.productCode}`}
+                                note={`// REVIEWS / ${reviewView === "edit" ? "EDIT" : "WRITE"} · ${selected.productCode}`}
                             >
-                                Review Write
+                                {reviewView === "edit" ? "Review Edit" : "Review Write"}
                             </PageTitle>
 
                             <div
@@ -990,7 +1022,9 @@ export function MyPage({ onBack }: { onBack: () => void }) {
                                         opacity: content.trim() ? 1 : 0.5,
                                     }}
                                 >
-                                    리뷰 등록하기 →
+                                    {reviewView === "edit"
+                                        ? "리뷰 수정하기 →"
+                                        : "리뷰 등록하기 →"}
                                 </button>
                             </div>
                         </>
