@@ -8,7 +8,6 @@ import { RefundModal } from "./RefundModal";
 
 const STEPS: OrderStatus[] = ["PAID", "PREPARING_DELIVERY", "SHIPPING", "DELIVERED"];
 
-/* 환불 신청은 결제 완료 이후 상태에서만 가능하다. 결제 대기·이미 취소된 주문은 대상이 아니다 */
 function canRequestRefund(status: OrderStatus) {
   return status !== "PENDING_PAYMENT" && status !== "CANCELED";
 }
@@ -18,7 +17,6 @@ const REFUND_STATUS_LABEL: Record<RefundHistory["status"], string> = {
   PG_FAILED: "환불 처리 지연 (확인 중)",
 };
 
-/* ─── 주문 상세 ──────────────────────────────────────────── */
 export function OrderDetail({
                               order,
                               onBack,
@@ -26,22 +24,18 @@ export function OrderDetail({
                             }: {
   order: OrderData;
   onBack: () => void;
-  /* 환불 등으로 주문 데이터가 바뀌었을 때, 최신 데이터를 다시 불러와서 반영한다 */
   onOrderUpdated: (updated: OrderData) => void;
 }) {
   const [showRefund, setShowRefund] = useState(false);
   const [refunds, setRefunds] = useState<RefundHistory[]>([]);
 
-  /* 환불 이력은 결제 건 단위라 orderId가 아니라 paymentId로 조회한다 */
   useEffect(() => {
     let active = true;
     fetchRefundHistory(order.paymentId)
         .then((history) => {
           if (active) setRefunds(history);
         })
-        .catch(() => {
-          /* 환불 이력이 없거나 조회 실패해도 주문 상세 자체는 정상 표시되어야 하므로 조용히 무시 */
-        });
+        .catch(() => {});
     return () => {
       active = false;
     };
@@ -68,7 +62,6 @@ export function OrderDetail({
         </button>
 
         <div style={{ border: `1px solid ${C.panelBorder}`, background: "rgba(0,0,0,0.18)" }}>
-          {/* 주문 요약 · 진행 단계 */}
           <section className="px-6 py-5" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
             <div className="flex flex-wrap items-center gap-3">
               <h1
@@ -93,7 +86,6 @@ export function OrderDetail({
             </span>
             </div>
 
-            {/* 취소 주문은 단계 대신 취소일 한 줄로 보여 준다 */}
             {canceled ? (
                 <p className="mt-5 text-sm" style={{ color: C.redBright, fontFamily: "Share Tech Mono" }}>
                   {order.canceledAt ? `${formatDate(order.canceledAt)} 취소됨` : "취소됨"}
@@ -103,9 +95,8 @@ export function OrderDetail({
             )}
           </section>
 
-          {/* 주문 품목 */}
           <section className="px-6 py-5" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
-            <SectionLabel>// 주문 품목 {order.items.length}건</SectionLabel>
+            <SectionLabel>주문 품목 {order.items.length}건</SectionLabel>
             {order.items.map((item, i) => (
                 <div key={item.orderItemId ?? i} style={{ borderTop: i > 0 ? `1px solid ${C.panelBorder}` : undefined }}>
                   <OrderItemRow item={item} />
@@ -113,10 +104,9 @@ export function OrderDetail({
             ))}
           </section>
 
-          {/* 배송 정보 · 결제 정보 */}
           <div className="grid grid-cols-1 md:grid-cols-2" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
             <section className="px-6 py-5">
-              <SectionLabel>// 배송 정보</SectionLabel>
+              <SectionLabel>배송 정보</SectionLabel>
               <InfoRow label="받는 사람">{order.receiverName}</InfoRow>
               <InfoRow label="연락처">{order.receiverPhone}</InfoRow>
               <InfoRow label="주소">{order.deliveryAddress}</InfoRow>
@@ -125,7 +115,7 @@ export function OrderDetail({
             </section>
 
             <section className="px-6 py-5 border-t md:border-t-0 md:border-l" style={{ borderColor: C.panelBorder }}>
-              <SectionLabel>// 결제 정보</SectionLabel>
+              <SectionLabel>결제 정보</SectionLabel>
               <AmountRow label="상품 합계">{krw(itemsTotal)}</AmountRow>
               <AmountRow label="수량 합계">{quantityTotal}개</AmountRow>
               <AmountRow label="결제 수단">{order.paymentMethod || "-"}</AmountRow>
@@ -144,10 +134,9 @@ export function OrderDetail({
             </section>
           </div>
 
-          {/* 환불 정보 — 환불 이력이 있을 때만 노출 */}
           {refunds.length > 0 && (
               <section className="px-6 py-5" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
-                <SectionLabel>// 환불 정보 {refunds.length}건</SectionLabel>
+                <SectionLabel>환불 정보 {refunds.length}건</SectionLabel>
                 {refunds.map((refund, i) => (
                     <div
                         key={refund.refundId}
@@ -179,7 +168,6 @@ export function OrderDetail({
               </section>
           )}
 
-          {/* 하단 액션 */}
           <div className="px-6 py-4 flex gap-3">
             <button
                 type="button"
@@ -214,14 +202,11 @@ export function OrderDetail({
   );
 }
 
-/* 지난 단계는 채운 점, 현재 단계는 굵은 테두리 점, 남은 단계는 흐린 테두리 점 */
 function OrderProgress({ status }: { status: OrderStatus }) {
-  /* 결제 대기는 아직 어느 단계에도 오지 않았으므로 -1 이 된다 */
   const current = STEPS.indexOf(status);
 
   return (
       <div className="relative grid grid-cols-4 mt-6">
-        {/* 첫 점부터 마지막 점까지 잇는 선 */}
         <div className="absolute top-[7px] left-[12.5%] right-[12.5%] h-px" style={{ background: C.panelBorder }} />
 
         {STEPS.map((step, i) => {

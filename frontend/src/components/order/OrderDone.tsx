@@ -1,7 +1,6 @@
 import { C, krw } from "../../lib/theme";
 import { SummaryRow } from "../common/SummaryRow";
 
-/* ─── order complete ─────────────────────────────────────── */
 export function OrderDone({ orderNo, total, onHome }: { orderNo: string; total: number; onHome: () => void }) {
   return (
     <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-16">
