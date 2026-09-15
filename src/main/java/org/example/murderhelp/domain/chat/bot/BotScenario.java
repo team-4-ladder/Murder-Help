@@ -19,17 +19,6 @@ public enum BotScenario {
             .build()
     ),
     
-    RECOMMEND_WEAPON(
-        BotMessageDto.builder()
-            .text("고객님의 등급에 맞는 추천 무기 리스트입니다.")
-            .options(Constants.RETURN_MENU_OPTIONS)
-            .products(List.of(
-                new BotProductDto("w-001", "소음기 장착 권총", 1500),
-                new BotProductDto("w-002", "저격 라이플", 3000)
-            ))
-            .build()
-    ),
-
     FALLBACK(
         BotMessageDto.builder()
             .text("버튼을 통해 원하시는 항목을 선택해 주세요.")
