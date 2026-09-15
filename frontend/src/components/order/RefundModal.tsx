@@ -108,7 +108,6 @@ export function RefundModal({
             style={{ background: "rgba(10,0,0,0.97)", border: `1px solid ${C.panelBorder}` }}
             onClick={(e) => e.stopPropagation()}
         >
-          {/* 헤더 */}
           <div
               className="flex items-center justify-between px-5 py-4"
               style={{ borderBottom: `1px solid ${C.panelBorder}` }}
@@ -148,7 +147,6 @@ export function RefundModal({
               </div>
           ) : (
               <>
-                {/* 환불 수량 선택 */}
                 <div className="px-5 pt-4 pb-2">
                   <p className="text-[11px]" style={{ color: C.textDim, fontFamily: "Share Tech Mono" }}>
                     환불 수량 선택
@@ -198,7 +196,6 @@ export function RefundModal({
                   ))}
                 </div>
 
-                {/* 선택 요약 */}
                 <div
                     className="flex items-center justify-between px-5 py-3"
                     style={{ borderBottom: `1px solid ${C.panelBorder}` }}
@@ -211,7 +208,6 @@ export function RefundModal({
               </span>
                 </div>
 
-                {/* 환불 사유 */}
                 <div className="px-5 py-4" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
                   <p className="text-[11px] mb-2" style={{ color: C.textDim }}>
                     환불 사유
@@ -267,7 +263,6 @@ export function RefundModal({
                     </p>
                 )}
 
-                {/* 버튼 */}
                 <div className="flex gap-2 px-5 py-4">
                   <button
                       onClick={onClose}
