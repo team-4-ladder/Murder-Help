@@ -133,7 +133,7 @@ export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
   }
 
   const periodLabel = PERIODS.find(([value]) => value === period)?.[1];
-  const note = period === "ALL" ? `// 전체 기간 · 총 ${total}건` : `// 최근 ${periodLabel} · 총 ${total}건`;
+  const note = period === "ALL" ? `전체 기간 · 총 ${total}건` : `최근 ${periodLabel} · 총 ${total}건`;
 
   return (
       <>

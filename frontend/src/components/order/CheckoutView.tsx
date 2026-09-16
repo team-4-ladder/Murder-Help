@@ -104,12 +104,12 @@ export function CheckoutView({
           ← 장바구니로
         </button>
 
-        <PageTitle note="// 배송 정보를 입력해 주세요">Checkout</PageTitle>
+        <PageTitle note="배송 정보를 입력해 주세요">Checkout</PageTitle>
 
         <form onSubmit={submit} className="flex flex-col lg:flex-row gap-6 items-start">
           <div className="flex-1 w-full p-6" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
             <div className="text-[10px] uppercase tracking-widest mb-5" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-              // 배송지
+              배송지
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
