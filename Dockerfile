@@ -36,5 +36,6 @@ EXPOSE 8080
 # 배포 환경(EC2 등)에서는 Parameter Store 값을 env-file 로 주입만 하면 되도록
 # prod 프로파일을 기본값으로 고정한다. 필요 시 컨테이너 실행 시 -e SPRING_PROFILES_ACTIVE=... 로 덮어쓸 수 있다.
 ENV SPRING_PROFILES_ACTIVE=prod
+ENV TZ=Asia/Seoul
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Duser.timezone=Asia/Seoul", "-jar", "app.jar"]
