@@ -472,40 +472,48 @@ sequenceDiagram
     rect rgb(240, 245, 255)
         Note over Customer,DB: [1단계] 주문 요청 및 검증
 
-        Customer->>Server: POST /api/orders (주문 상품 및 수량)
-        Server->>Server: 요청 정보 및 주문 가능 여부 검증
+        Customer->>Server: POST /api/orders (장바구니 항목 ID 목록, 배송 정보)
+        Server->>Server: 요청 값 검증 (@Valid)
+        Server->>DB: 트랜잭션 시작
+        Server->>DB: 본인 장바구니 항목 조회
+        DB-->>Server: 장바구니 항목 (상품 ID·수량)
+
+        break 요청한 항목 중 조회되지 않는 항목이 있음
+            Server->>DB: 롤백
+            Server-->>Customer: 400 잘못된 입력
+        end
     end
 
     rect rgb(255, 252, 235)
-        Note over Server,DB: [2단계] 재고 확인 및 확보
+        Note over Server,DB: [2단계] 재고 확인 및 차감
 
-        Server->>DB: 트랜잭션 시작
-        Server->>DB: 주문 상품 재고 조회 (FOR UPDATE)
+        Server->>DB: 주문 상품 조회 (FOR UPDATE, id 순 정렬)
         DB-->>Server: 상품 정보 및 현재 재고 반환
+        Server->>Server: 상품별로 판매 상태·재고 확인 후 차감
 
-        alt 하나라도 재고 부족
+        break 판매 중이 아니거나 재고 부족 (처음 걸린 상품에서 중단)
             Server->>DB: 전체 롤백
-            Server-->>Customer: 주문 실패 (재고 부족 상품 목록)
-        else 모든 상품 재고 충분
-            Server->>DB: 주문 수량만큼 재고 차감
-
-            rect rgb(240, 255, 242)
-                Note over Server,DB: [3단계] 주문 생성
-
-                Server->>Server: 주문 금액 계산
-                Server->>DB: 주문 저장 (PENDING)
-                Server->>DB: 주문 상품 저장 (상품명·단가·수량 스냅샷)
-                Server->>DB: 트랜잭션 커밋
-                DB-->>Server: 저장 완료
-            end
-
-            rect rgb(245, 240, 255)
-                Note over Customer,Server: [4단계] 주문 완료 및 결제 안내
-
-                Server-->>Customer: 주문 생성 완료 (order_id, status: PENDING)
-                Note over Customer: 결제 단계로 진행
-            end
+            Server-->>Customer: 400 주문 실패 (예외 메시지)
         end
+    end
+
+    rect rgb(240, 255, 242)
+        Note over Server,DB: [3단계] 주문 생성
+
+        Server->>Server: 주문 금액 계산 (단가 × 수량 합계)
+        Server->>DB: 주문 저장 (PENDING_PAYMENT)
+        Server->>DB: 주문 상품 저장 (상품명·단가·수량 스냅샷)
+        Server->>DB: 결제 정보 저장 (PENDING)
+        Server->>Server: 상품 캐시 무효화
+        Server->>DB: 트랜잭션 커밋 (재고 차감 반영)
+        DB-->>Server: 저장 완료
+    end
+
+    rect rgb(245, 240, 255)
+        Note over Customer,Server: [4단계] 주문 완료 및 결제 안내
+
+        Server-->>Customer: 200 OK (orderId, paymentId, portonePaymentId, status: PENDING_PAYMENT)
+        Note over Customer: 결제 단계로 진행
     end
 ```
 
@@ -581,40 +589,62 @@ sequenceDiagram
     participant DB
 
     rect rgba(126,109,255,0.08)
-    Note over 고객,DB: [1단계] 환불 요청 접수
-    고객->>주문서버: POST /api/orders/{orderId}/refund
-    주문서버->>DB: 주문 및 결제 정보 조회
-    DB-->>주문서버: 주문 정보 반환
+        Note over 고객,DB: [1단계] 환불 요청 접수 및 잔액 대조
+        고객->>주문서버: POST /api/refunds (paymentId, 환불 사유, 상품별 환불 수량)
+        주문서버->>DB: 결제 및 주문 정보 조회
+        DB-->>주문서버: 결제 정보 반환
+        opt PG 결제 금액이 0원보다 큼
+            주문서버->>PG: 결제 조회
+            PG-->>주문서버: 결제 금액·취소된 금액 반환
+            주문서버->>주문서버: PG 잔액과 DB 잔액 비교
+            break 잔액 불일치
+                주문서버-->>고객: 409 DB·PG 잔액 불일치
+            end
+        end
     end
-    
+
     rect rgba(240,140,60,0.08)
-    Note over 고객,DB: [2단계] 환불 정책 검증
-    주문서버->>주문서버: 환불 가능 상태 확인
-    alt 정책 위반
-            주문서버-->>고객: 400 환불 불가 응답
-    else 정책 통과
-        주문서버->>DB: 환불 요청 상태 저장 (REQUESTED)
-    end
+        Note over 고객,DB: [2단계] 환불 검증 및 DB 반영 (하나의 트랜잭션)
+        주문서버->>DB: 트랜잭션 시작
+        주문서버->>DB: 결제 건 잠금 (FOR UPDATE)
+        주문서버->>DB: 결제·주문 상품·기존 환불 내역 조회
+        DB-->>주문서버: 조회 결과 반환
+        주문서버->>주문서버: 환불 가능 여부 검증
+        break 검증 실패
+            주문서버->>DB: 롤백
+            주문서버-->>고객: 4xx 환불 불가 응답
+            Note over 주문서버: 429 5초 내 중복 요청<br/>403 본인 결제 아님<br/>400 환불 불가 결제 상태<br/>404 주문 상품 없음<br/>400 환불 가능 수량 초과
+        end
+        주문서버->>주문서버: 전액/부분 환불 판단 및 환불 금액 계산
+        alt 전액 환불
+            주문서버->>DB: 결제 FULL_REFUND, 주문 CANCELED
+        else 부분 환불
+            주문서버->>DB: 결제 PARTIAL_REFUND (주문 상태 유지)
+        end
+        주문서버->>DB: 환불 상품 잠금 (FOR UPDATE) 후 재고 복원
+        주문서버->>DB: 환불 내역(COMPLETED)·환불 상품 저장
+        주문서버->>DB: 회원 누적 구매금액·등급 차감
+        주문서버->>DB: 트랜잭션 커밋
     end
 
     rect rgba(217,90,90,0.08)
-    Note over 고객,DB: [3단계] PG 결제 취소
-    주문서버->>PG: 결제 취소/부분취소 요청
-    PG-->>주문서버: 취소 처리 결과 반환
-    alt 취소 성공
-        주문서버->>DB: 재고 복원
-        DB-->>주문서버: 복원 완료
-    else 취소 실패
-        주문서버->>DB: 환불 상태 REFUND_FAILED로 갱신
-    end
+        Note over 고객,DB: [3단계] PG 결제 취소
+        alt PG 환불 금액 0원
+            주문서버->>주문서버: PG 호출 생략 (성공 처리)
+        else PG 환불 금액 있음
+            주문서버->>PG: 결제 취소/부분취소 요청 (타임아웃 시 최대 3회 시도)
+            PG-->>주문서버: 취소 처리 결과 반환
+        end
+        opt 취소 실패
+            주문서버->>DB: 환불 상태 PG_FAILED로 갱신
+            Note over 주문서버: 재고·결제 상태는 되돌리지 않음<br/>CRITICAL 로그로 수동 보정 요청
+        end
     end
 
     rect rgba(90,200,140,0.08)
-    Note over 고객,DB: [4단계] 환불 결과 응답
-    주문서버->>DB: 주문 상태 REFUNDED로 갱신 및 이력 저장
-    주문서버-->>고객: 200 OK (환불 완료/실패 결과)
+        Note over 고객,DB: [4단계] 환불 결과 응답
+        주문서버-->>고객: 200 OK (refundId, status, pgRefundAmount, refundedAt)
     end
-
 ```
 
 </details>
