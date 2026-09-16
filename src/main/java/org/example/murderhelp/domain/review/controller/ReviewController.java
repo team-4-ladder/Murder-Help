@@ -2,9 +2,14 @@ package org.example.murderhelp.domain.review.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.example.murderhelp.domain.review.dto.*;
+import org.example.murderhelp.domain.review.dto.MyReviewResponse;
+import org.example.murderhelp.domain.review.dto.PendingReviewResponse;
+import org.example.murderhelp.domain.review.dto.ReviewCreateRequest;
+import org.example.murderhelp.domain.review.dto.ReviewResponse;
+import org.example.murderhelp.domain.review.dto.ReviewUpdateRequest;
 import org.example.murderhelp.domain.review.service.ReviewService;
 import org.example.murderhelp.global.response.ApiResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,11 +33,14 @@ public class ReviewController {
      * 리뷰 작성 가능한 주문상품 조회
      */
     @GetMapping("/pending")
-    public ApiResponse<List<PendingReviewResponse>> getPendingReviews(
+    public ResponseEntity<ApiResponse<List<PendingReviewResponse>>> getPendingReviews(
             @AuthenticationPrincipal Long memberId
     ) {
-        return ApiResponse.ok(
-                reviewService.getPendingReviews(memberId)
+        List<PendingReviewResponse> response =
+                reviewService.getPendingReviews(memberId);
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(response)
         );
     }
 
@@ -40,11 +48,14 @@ public class ReviewController {
      * 로그인 회원이 작성한 리뷰 조회
      */
     @GetMapping("/me")
-    public ApiResponse<List<MyReviewResponse>> getMyReviews(
+    public ResponseEntity<ApiResponse<List<MyReviewResponse>>> getMyReviews(
             @AuthenticationPrincipal Long memberId
     ) {
-        return ApiResponse.ok(
-                reviewService.getMyReviews(memberId)
+        List<MyReviewResponse> response =
+                reviewService.getMyReviews(memberId);
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(response)
         );
     }
 
@@ -52,12 +63,18 @@ public class ReviewController {
      * 리뷰 작성
      */
     @PostMapping
-    public ApiResponse<ReviewResponse> createReview(
+    public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
             @AuthenticationPrincipal Long memberId,
-            @RequestBody @Valid ReviewCreateRequest request
+            @Valid @RequestBody ReviewCreateRequest request
     ) {
-        return ApiResponse.ok(
-                reviewService.createReview(memberId, request)
+        ReviewResponse response =
+                reviewService.createReview(
+                        memberId,
+                        request
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(response)
         );
     }
 
@@ -65,13 +82,20 @@ public class ReviewController {
      * 리뷰 수정
      */
     @PatchMapping("/{reviewId}")
-    public ApiResponse<ReviewResponse> updateReview(
+    public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long reviewId,
-            @RequestBody @Valid ReviewUpdateRequest request
+            @Valid @RequestBody ReviewUpdateRequest request
     ) {
-        return ApiResponse.ok(
-                reviewService.updateReview(memberId, reviewId, request)
+        ReviewResponse response =
+                reviewService.updateReview(
+                        memberId,
+                        reviewId,
+                        request
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(response)
         );
     }
 
@@ -79,12 +103,17 @@ public class ReviewController {
      * 리뷰 삭제
      */
     @DeleteMapping("/{reviewId}")
-    public ApiResponse<Void> deleteReview(
+    public ResponseEntity<ApiResponse<Void>> deleteReview(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long reviewId
     ) {
-        reviewService.deleteReview(memberId, reviewId);
+        reviewService.deleteReview(
+                memberId,
+                reviewId
+        );
 
-        return ApiResponse.ok();
+        return ResponseEntity.ok(
+                ApiResponse.ok()
+        );
     }
 }
