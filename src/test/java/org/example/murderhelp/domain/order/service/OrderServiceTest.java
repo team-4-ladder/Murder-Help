@@ -121,8 +121,8 @@ class OrderServiceTest {
 
         Product pistol = createProduct("권총", 100_000L);
         Product knife = createProduct("단검", 30_000L);
-        OrderItem orderItem1 = new OrderItem(order1, pistol, 1);
-        OrderItem orderItem2 = new OrderItem(order1, knife, 2);
+        OrderItem orderItem1 = OrderItem.create(order1, pistol, 1);
+        OrderItem orderItem2 = OrderItem.create(order1, knife, 2);
 
         OrderListRequest request = new OrderListRequest(OrderListPeriod.MONTH_3, null);
         when(orderRepository.findAllListPage(eq(1L), any(LocalDateTime.class), isNull(), eq(pageable)))
@@ -153,7 +153,7 @@ class OrderServiceTest {
     void shouldReturnOrderDetailsForOwner() {
         // given
         Order order = createOrderEntity(10L, createMember(1L));
-        OrderItem orderItem = new OrderItem(order, createProduct("권총", 100_000L), 2);
+        OrderItem orderItem = OrderItem.create(order, createProduct("권총", 100_000L), 2);
 
         when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
         when(orderItemRepository.findAllByOrder_Id(10L)).thenReturn(List.of(orderItem));
