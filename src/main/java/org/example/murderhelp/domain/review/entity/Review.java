@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.murderhelp.global.entity.BaseTimeEntity;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 
 @Entity
 @Table(
@@ -54,7 +56,7 @@ public class Review extends BaseTimeEntity {
 
     private void validateRating(Integer rating) {
         if (rating == null || rating < 1 || rating > 5) {
-            throw new IllegalArgumentException("평점은 1~5 사이여야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "평점은 1~5 사이여야 합니다.");
         }
     }
 }
