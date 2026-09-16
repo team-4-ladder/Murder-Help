@@ -12,6 +12,7 @@ public record ChatMessageResponse(
     String senderEmail,
     String senderName,
     String senderGrade,
+    String senderProfileImageUrl,
     String content,
     ChatMessageType messageType,
     LocalDateTime createdAt
@@ -21,6 +22,7 @@ public record ChatMessageResponse(
         String senderEmail = chatMessage.getSender().getEmail();
         String senderName = chatMessage.getSender().getName();
         String senderGrade = chatMessage.getSender().getGrade().name();
+        String senderProfileImageUrl = chatMessage.getSender().getProfileImageUrl();
 
         return new ChatMessageResponse(
             chatMessage.getId(),
@@ -29,6 +31,7 @@ public record ChatMessageResponse(
             senderEmail,
             senderName,
             senderGrade,
+            senderProfileImageUrl,
             chatMessage.getContent(),
             chatMessage.getMessageType(),
             chatMessage.getCreatedAt()

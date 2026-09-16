@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
 import org.example.murderhelp.domain.order.repository.OrderItemRepository;
 import org.example.murderhelp.domain.product.entity.ProductTier;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,31 @@ public class ProductRankingService {
 
     public static final String RANKING_TARGET_KEY_PREFIX = "ranking:weekly:best:";
     private static final String RANKING_TEMP_KEY_PREFIX = "ranking:weekly:best:temp:";
+
+    /**
+     * 서버 기동 시 자동 실행 — 등급별 랭킹 캐시가 하나라도 없을 때만 워밍업
+     * (단순 재배포 등으로 Redis에 모든 랭킹 캐시가 이미 존재하면 불필요한 집계 쿼리를 건너뜀)
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUpOnStartup() {
+        log.info("[랭킹 워밍업] 서버 기동 — Redis 랭킹 캐시 상태 확인 중...");
+
+        boolean anyMissing = Arrays.stream(ProductTier.values())
+                .filter(tier -> tier != ProductTier.GREEN)
+                .anyMatch(tier -> {
+                    String key = RANKING_TARGET_KEY_PREFIX + tier.name().toLowerCase();
+                    return !Boolean.TRUE.equals(redisTemplate.hasKey(key));
+                });
+
+        if (!anyMissing) {
+            log.info("[랭킹 워밍업] 모든 등급 랭킹 캐시가 이미 존재합니다. 워밍업을 건너뜁니다.");
+            return;
+        }
+
+        log.info("[랭킹 워밍업] 랭킹 캐시 미존재 감지 — updateWeeklyBestProducts() 실행합니다.");
+        updateWeeklyBestProducts();
+        log.info("[랭킹 워밍업] 인기 상품 랭킹 캐시 워밍업 완료.");
+    }
 
     @Transactional(readOnly = true)
     public void updateWeeklyBestProducts() {

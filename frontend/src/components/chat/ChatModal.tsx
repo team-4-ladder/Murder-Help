@@ -9,14 +9,10 @@ export default function ChatModal({ customerId, onClose }: { customerId: number;
 
   return (
     <div 
-      className="fixed bottom-28 right-8 w-[380px] h-[550px] flex flex-col shadow-[0_0_30px_rgba(0,0,0,1)] rounded-lg overflow-hidden z-50 transition-all"
-      style={{ background: "rgba(10,0,0,0.95)", border: "1px solid rgba(204,34,0,0.4)" }}
+      className="fixed bottom-28 right-8 w-[380px] h-[550px] flex flex-col shadow-[0_0_30px_rgba(0,0,0,1)] rounded-lg overflow-hidden z-50 transition-all bg-[#0a0000]/95 border border-chat-border-light"
     >
       {/* Header */}
-      <div 
-        className="px-4 py-3 flex justify-between items-center border-b"
-        style={{ borderColor: "rgba(204,34,0,0.3)", background: "#1a0000" }}
-      >
+      <div className="px-4 py-3 flex justify-between items-center border-b border-chat-border bg-chat-dark">
         <div className="flex items-center gap-2">
           {activeRoomId && (
             <button 

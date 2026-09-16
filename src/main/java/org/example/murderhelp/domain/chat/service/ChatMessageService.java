@@ -56,11 +56,11 @@ public class ChatMessageService {
                 .messageType(ChatMessageType.SYSTEM)
                 .build();
 
-        // 종료 시스템 메시지 저장/발행
+        // 종료 시스템 메시지 저장 후 Redis 캐시 삭제 (재기록 금지 — COMPLETED 방은 lastMessage 미노출)
         chatMessageRepository.save(closeMsg);
-        updateLastMessageInRedis(room.getId(), closeMsg.getContent());
+        deleteLastMessageFromRedis(room.getId());
         publishMessageEvent(room.getId(), closeMsg);
-        publishRoomUpdate(room);
+        publishRoomUpdatedEvent(room);
     }
 
 
@@ -84,13 +84,13 @@ public class ChatMessageService {
                 .chatRoom(room)
                 .sender(sender)
                 .content(request.content())
-                .messageType(request.messageType() != null ? request.messageType() : ChatMessageType.TEXT)
+                .messageType(request.messageType())
                 .build();
 
         chatMessageRepository.save(message);
         updateLastMessageInRedis(room.getId(), message.getContent());
         publishMessageEvent(room.getId(), message);
-        publishRoomUpdate(room);
+        publishRoomUpdatedEvent(room);
 
         // 챗봇 메시지
         if (room.getStatus().isBotActive() && isCustomer) {
@@ -111,7 +111,7 @@ public class ChatMessageService {
         chatMessageRepository.save(sysMsg);
         updateLastMessageInRedis(room.getId(), sysMsg.getContent());
         publishMessageEvent(room.getId(), sysMsg);
-        publishRoomUpdate(room);
+        publishRoomUpdatedEvent(room);
     }
 
     @Transactional
@@ -133,7 +133,7 @@ public class ChatMessageService {
             chatMessageRepository.save(botMsg);
             updateLastMessageInRedis(room.getId(), "[챗봇 메시지]");
             publishMessageEvent(room.getId(), botMsg);
-            publishRoomUpdate(room);
+            publishRoomUpdatedEvent(room);
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -143,15 +143,21 @@ public class ChatMessageService {
         redisTemplate.opsForHash().put("chat_last_messages", roomId.toString(), content);
     }
 
+    private void deleteLastMessageFromRedis(Long roomId) {
+        redisTemplate.opsForHash().delete("chat_last_messages", roomId.toString());
+    }
+
     private void publishMessageEvent(Long roomId, ChatMessage message) {
         eventPublisher.publishEvent(ChatMessageCreatedEvent.of(roomId, message));
     }
 
-    public void publishRoomUpdate(ChatRoom room) {
+    private void publishRoomUpdatedEvent(ChatRoom room) {
         eventPublisher.publishEvent(ChatRoomUpdatedEvent.from(room));
     }
 
-    public Page<ChatMessageResponse> getMessageHistory(Long roomId, Pageable pageable) {
+    public Page<ChatMessageResponse> getMessageHistory(Long roomId, Long memberId, Pageable pageable) {
+        ChatRoom room = chatRoomService.getRoomEntity(roomId);
+        chatRoomService.validateRoomAccess(room, memberId);
         return chatMessageRepository.findMessagesByRoomId(roomId, pageable)
                 .map(ChatMessageResponse::from);
     }
