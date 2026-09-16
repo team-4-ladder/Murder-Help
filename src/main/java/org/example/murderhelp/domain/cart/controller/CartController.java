@@ -9,6 +9,7 @@ import org.example.murderhelp.domain.cart.dto.CartItemResponse;
 import org.example.murderhelp.domain.cart.dto.CartItemsDeleteRequest;
 import org.example.murderhelp.domain.cart.service.CartService;
 import org.example.murderhelp.global.response.ApiResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,44 +30,44 @@ public class CartController {
     private final CartService cartService;
 
     @PostMapping
-    public ApiResponse<CartItemResponse> addItem(
+    public ResponseEntity<ApiResponse<CartItemResponse>> addItem(
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody CartItemAddRequest request
     ) {
-        return ApiResponse.ok(cartService.addItem(memberId, request));
+        return ResponseEntity.ok(ApiResponse.ok(cartService.addItem(memberId, request)));
     }
 
     @GetMapping
-    public ApiResponse<List<CartItemDetailResponse>> getItems(
+    public ResponseEntity<ApiResponse<List<CartItemDetailResponse>>> getItems(
             @AuthenticationPrincipal Long memberId
     ) {
-        return ApiResponse.ok(cartService.getItems(memberId));
+        return ResponseEntity.ok(ApiResponse.ok(cartService.getItems(memberId)));
     }
 
     @PatchMapping("/{cartItemId}")
-    public ApiResponse<CartItemResponse> updateItemQuantity(
+    public ResponseEntity<ApiResponse<CartItemResponse>> updateItemQuantity(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long cartItemId,
             @Valid @RequestBody CartItemUpdateRequest request
     ) {
-        return ApiResponse.ok(cartService.updateItemQuantity(memberId, cartItemId, request));
+        return ResponseEntity.ok(ApiResponse.ok(cartService.updateItemQuantity(memberId, cartItemId, request)));
     }
 
     @DeleteMapping("/{cartItemId}")
-    public ApiResponse<Void> deleteItem(
+    public ResponseEntity<ApiResponse<Void>> deleteItem(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long cartItemId
     ) {
         cartService.deleteItem(memberId, cartItemId);
-        return ApiResponse.ok();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 
     @DeleteMapping
-    public ApiResponse<Void> deleteItems(
+    public ResponseEntity<ApiResponse<Void>> deleteItems(
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody CartItemsDeleteRequest request
     ) {
         cartService.deleteItems(memberId, request.cartItemIds());
-        return ApiResponse.ok();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }
