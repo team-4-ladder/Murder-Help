@@ -40,6 +40,12 @@ export interface PageResponse<T> {
   totalElements: number;
 }
 
+export interface CursorPageResponse<T> {
+  content: T[];
+  hasNext: boolean;
+  nextCursorId: number | null;
+}
+
 export interface BotOptionDto {
   label: string;
   action: string;

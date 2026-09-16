@@ -5,8 +5,8 @@ import { subscribeChatSocket, onChatSocketReconnect, isChatSocketConnected, publ
 
 export function useChatRoom(roomId: number) {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
-  const [page, setPage] = useState(0);
-  const [isLast, setIsLast] = useState(false);
+  const [lastMessageId, setLastMessageId] = useState<number | null>(null);
+  const [hasNext, setHasNext] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [status, setStatus] = useState<ChatRoomStatus>("BOT_MODE");
@@ -33,7 +33,7 @@ export function useChatRoom(roomId: number) {
       })
       .catch(err => console.warn("방 상태 조회 실패:", err));
 
-    loadMoreMessages(0, true);
+    loadMoreMessages(true);
 
     const unsubscribeMessages = subscribeChatSocket(`/sub/chat/room/${roomId}`, (body) => {
       const newMsg = JSON.parse(body) as ChatMessageResponse;
@@ -73,7 +73,7 @@ export function useChatRoom(roomId: number) {
     // 재연결된 경우, 끊겨 있던 동안 놓쳤을 수 있는 메시지를 최신 페이지로 다시 채운다.
     const unsubscribeReconnect = onChatSocketReconnect(() => {
       isInitialMount.current = true;
-      loadMoreMessages(0, true);
+      loadMoreMessages(true);
     });
 
     return () => {
@@ -85,30 +85,31 @@ export function useChatRoom(roomId: number) {
     };
   }, [roomId]);
 
-  // 2. 과거 메시지 로딩 함수
-  const loadMoreMessages = async (pageToLoad: number, isInitial = false) => {
+  // 2. 과거 메시지 로딩 함수 (lastMessageId 커서 기반)
+  const loadMoreMessages = async (isInitial = false) => {
     if (isFetchingHistory.current) return;
     isFetchingHistory.current = true;
     setIsLoading(true);
     setIsError(false);
 
     try {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages?page=${pageToLoad}&size=20`, {
+      const cursorParam = !isInitial && lastMessageId != null ? `&lastMessageId=${lastMessageId}` : "";
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?size=20${cursorParam}`, {
         headers: { Authorization: `Bearer ${getAccessToken()}` }
       });
       if (!res.ok) throw new Error("메시지 내역 조회 실패");
       const json = await res.json();
-      
+
       if (json.data && json.data.content) {
-        const newMsgs = [...json.data.content].reverse(); 
-        
+        const newMsgs = [...json.data.content].reverse();
+
         if (!isInitial && containerRef.current) {
           previousScrollHeight.current = containerRef.current.scrollHeight;
         }
 
         setMessages(prev => isInitial ? newMsgs : [...newMsgs, ...prev]);
-        setIsLast(json.data.last);
-        setPage(pageToLoad);
+        setHasNext(json.data.hasNext);
+        setLastMessageId(json.data.nextCursorId);
       }
     } catch (error) {
       console.warn("과거 메시지 로드 에러:", error);
@@ -125,13 +126,13 @@ export function useChatRoom(roomId: number) {
       if (isInitialMount.current && messages.length > 0) {
         containerRef.current.scrollTop = containerRef.current.scrollHeight;
         isInitialMount.current = false;
-      } else if (page > 0 && previousScrollHeight.current > 0) {
+      } else if (previousScrollHeight.current > 0) {
         const currentScrollHeight = containerRef.current.scrollHeight;
         containerRef.current.scrollTop = currentScrollHeight - previousScrollHeight.current;
         previousScrollHeight.current = 0;
       }
     }
-  }, [messages, page]);
+  }, [messages]);
 
   // 4. 스크롤 이벤트 핸들러
   const handleScroll = () => {
@@ -139,8 +140,8 @@ export function useChatRoom(roomId: number) {
       const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
       setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 100);
 
-      if (scrollTop === 0 && !isLast && !isLoading) {
-        loadMoreMessages(page + 1);
+      if (scrollTop === 0 && hasNext && !isLoading) {
+        loadMoreMessages(false);
       }
     }
   };
