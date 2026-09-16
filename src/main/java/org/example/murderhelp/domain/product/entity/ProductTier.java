@@ -2,6 +2,8 @@ package org.example.murderhelp.domain.product.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 
 import java.util.Locale;
 
@@ -24,7 +26,7 @@ public enum ProductTier {
 
     public static ProductTier fromValue(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("상품 등급은 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "상품 등급은 필수입니다.");
         }
 
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
@@ -32,7 +34,8 @@ public enum ProductTier {
             case "purple" -> PURPLE;
             case "red" -> RED;
             case "green" -> GREEN;
-            default -> throw new IllegalArgumentException(
+            default -> throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
                     "지원하지 않는 상품 등급입니다: " + value
             );
         };
