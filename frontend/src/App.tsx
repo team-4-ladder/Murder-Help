@@ -19,7 +19,7 @@ import {
   type PopularSearch,
   type ProductDetailData,
 } from "./api/products";
-import {NAV_ITEMS, Product, SUBCATS, type Tier} from "./catalog";
+import {NAV_ITEMS, SUBCATS, type Tier} from "./catalog";
 import { Gate } from "./components/auth/Gate";
 import { LoginModal } from "./components/auth/LoginModal";
 import { ProductRankingAdmin } from "./components/admin/ProductRankingAdmin";
@@ -186,15 +186,6 @@ export default function App() {
   const [activeNav, setActiveNav] = useState("Guns");
   const [activeSub, setActiveSub] = useState("전체");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [knownProducts, setKnownProducts] = useState<Product[]>([]);
-  const [productSort, setProductSort] = useState<ApiProductSort>("POPULAR");
-  const [productPage, setProductPage] = useState(1);
-  const [productTotal, setProductTotal] = useState(0);
-  const [hasNextProducts, setHasNextProducts] = useState(false);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsError, setProductsError] = useState<string | null>(null);
-  const [productReloadKey, setProductReloadKey] = useState(0);
 
   /* ── 상품 목록/검색/상세 (백엔드 연동) ──
      상품 코드는 기존 화면과 장바구니 식별자로 유지하고,
@@ -760,10 +751,6 @@ export default function App() {
     /* 주문서를 완료 화면으로 대체한다 — 뒤로 가기로 비워진 주문서에 돌아가지 않도록 */
     navigate({ name: "done", orderNo, total }, true);
   }
-
-  /* 카테고리, 서브 카테고리, 등급, 정렬 조건은 백엔드가 적용한다. */
-  const filtered = products;
-
 
   /* 뒤로 가기로 예전 세션의 상위 등급 상품에 돌아올 수 있으므로 여기서도 막는다 */
   const detailAllowed = detailProduct !== null && canAccess(userTier, detailProduct.tier);
