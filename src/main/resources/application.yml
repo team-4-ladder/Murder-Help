@@ -13,7 +13,7 @@ spring:
       port: ${REDIS_PORT:6379}
 
   datasource:
-    url: jdbc:mysql://localhost:3306/murder_help?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://localhost:3306/killer_mall?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: killer_admin
     password: 12345678
     driver-class-name: com.mysql.cj.jdbc.Driver

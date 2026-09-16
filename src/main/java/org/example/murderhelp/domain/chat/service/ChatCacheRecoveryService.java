@@ -8,8 +8,6 @@ import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
 import org.example.murderhelp.domain.chat.repository.ChatMessageRepository;
 import org.example.murderhelp.domain.chat.repository.ChatRoomRepository;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +27,9 @@ public class ChatCacheRecoveryService {
     private static final String LAST_MESSAGES_KEY = "chat_last_messages";
 
     /**
-     * 앱 시작 시 자동 실행 — Redis가 비어있거나 부분 캐시 상태일 경우 DB에서 복구
-     * (Redis 항목 수 ≥ 활성 채팅방 수인 경우에만 skip — 부분 캐시 시 복구 실행)
+     * 기동 시 조건부 복구 — ChatCacheWarmupListener에 의해 호출됨 (test 프로파일 제외)
+     * Redis 항목 수 ≥ 활성 채팅방 수이면 skip, 그렇지 않으면 DB에서 복구
      */
-    @EventListener(ApplicationReadyEvent.class)
     public void restoreOnStartup() {
         log.info("[채팅 캐시 복구] 시작 — Redis chat_last_messages 상태 확인 중...");
 
