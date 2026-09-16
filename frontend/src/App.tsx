@@ -82,7 +82,7 @@ type View =
     | { name: "cart" }
     | { name: "checkout" }
     | { name: "done"; orderNo: string; total: number }
-    | { name: "mypage" }
+    | { name: "mypage"; section?: "orders"; orderId?: number }
     | { name: "admin" };
 
 /* ─── 공통 조각 ──────────────────────────────────────────── */
@@ -1285,7 +1285,12 @@ export default function App() {
       )}
 
       {session && authReady && view.name === "mypage" && (
-        <MyPage onBack={() => navigate({ name: "list" })} />
+        <MyPage
+          key={view.orderId ?? "default"}
+          onBack={() => navigate({ name: "list" })}
+          initialSection={view.section}
+          initialOrderId={view.orderId}
+        />
       )}
 
       {session && authReady && userTier === "green" && view.name === "admin" && (

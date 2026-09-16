@@ -41,10 +41,12 @@ type Props = {
   onWriteReview: () => void;
   /* 리뷰를 쓰고 돌아왔을 때 '리뷰 작성 완료' 로 바뀌도록 바깥에서 다시 불러오게 한다 */
   refreshKey?: number;
+  /* 챗봇 주문 링크 등 외부에서 특정 주문 상세로 바로 진입시킬 때 사용 */
+  initialOrderId?: number;
 };
 
 /* ─── 내 주문내역 ────────────────────────────────────────── */
-export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
+export function MyOrders({ onShop, onWriteReview, refreshKey = 0, initialOrderId }: Props) {
   const [period, setPeriod] = useState<OrderPeriod>("MONTH_3");
   const [status, setStatus] = useState<OrderStatus | "">("");
   /* 백엔드는 page=1 을 첫 페이지로 받는다(WebConfig 의 oneIndexedParameters) */
@@ -58,7 +60,7 @@ export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   /* 상세는 orderId 만 넘기고 상세 화면이 직접 조회한다 */
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(initialOrderId ?? null);
 
   /* 기간·상태·페이지가 바뀌는 순간 바로 서버에 다시 조회한다 */
   useEffect(() => {

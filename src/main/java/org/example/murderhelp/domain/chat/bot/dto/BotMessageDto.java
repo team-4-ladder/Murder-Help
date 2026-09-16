@@ -7,6 +7,8 @@ import lombok.Builder;
 public record BotMessageDto(
     String title,
     String text,
+    Long orderId,
+    String orderStatus,
     List<BotOptionDto> options,
     List<BotProductDto> products
 ) {}

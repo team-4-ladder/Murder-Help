@@ -34,7 +34,7 @@ public class ChatMessage extends BaseTimeEntity {
     private ChatMessageType messageType;
 
     @Builder
-    public ChatMessage(ChatRoom chatRoom, Member sender, String content, ChatMessageType messageType) {
+    private ChatMessage(ChatRoom chatRoom, Member sender, String content, ChatMessageType messageType) {
         this.chatRoom = chatRoom;
         this.sender = sender;
         this.content = content;
