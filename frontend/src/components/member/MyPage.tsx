@@ -8,6 +8,7 @@ import { authFetch } from "../../api/client";
 import { C } from "../../lib/theme";
 import { PageTitle } from "../common/PageTitle";
 import { MyOrders } from "./MyOrders";
+import {OrderData, OrderItemData} from "@/api/orders.ts";
 
 type Section = "profile" | "orders" | "reviews";
 type Tab = "pending" | "written";
@@ -964,9 +965,7 @@ function openReviewManagement() {
                                 ← 리뷰 목록으로
                             </button>
 
-                            <PageTitle
-                                note={`// REVIEWS / ${reviewView === "edit" ? "EDIT" : "WRITE"} · ${selected.productCode}`}
-                            >
+                            <PageTitle>
                                 {reviewView === "edit" ? "Review Edit" : "Review Write"}
                             </PageTitle>
 
