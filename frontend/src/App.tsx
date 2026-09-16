@@ -233,6 +233,12 @@ export default function App() {
     navigate({ name: "list" });
   }
 
+  function clearSearch() {
+    pendingPopularSearch.current = null;
+    setSearchInput("");
+    setSearchKeyword("");
+  }
+
   useEffect(() => {
     if (!searchFocused || searchInput.trim()) return;
 
@@ -518,7 +524,7 @@ export default function App() {
     setActiveNav("Guns");
     setActiveSub("전체");
     setMenuOpen(false);
-    setSearchInput("");
+    clearSearch();
     navigate({ name: "list" });
   }
 
@@ -581,7 +587,13 @@ export default function App() {
     setActiveNav(cat);
     setActiveSub("전체");
     setMenuOpen(false);
-    setSearchInput("");
+    clearSearch();
+    navigate({ name: "list" });
+  }
+
+  function changeSubCategory(subCategory: string) {
+    setActiveSub(subCategory);
+    clearSearch();
     navigate({ name: "list" });
   }
 
@@ -1089,13 +1101,13 @@ export default function App() {
               {/* ── MAIN ────────────────────────────────────── */}
               <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6">
                 <div className="flex gap-0" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
-                  <Sidebar category={activeNav} activeSub={activeSub} onSub={setActiveSub} />
+                  <Sidebar category={activeNav} activeSub={activeSub} onSub={changeSubCategory} />
 
                   <div className="flex-1 p-5">
                     {/* mobile subcats */}
                     <div className="flex md:hidden gap-2 flex-wrap mb-4">
                       {(SUBCATS[activeNav] ?? []).map((s) => (
-                          <button key={s} onClick={() => setActiveSub(s)}
+                          <button key={s} onClick={() => changeSubCategory(s)}
                                   className="text-[10px] uppercase tracking-widest px-2.5 py-1 transition-all"
                                   style={{
                                     fontFamily: "Share Tech Mono",
