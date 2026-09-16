@@ -5,6 +5,7 @@ import lombok.Builder;
 
 @Builder
 public record BotMessageDto(
+    String title,
     String text,
     List<BotOptionDto> options,
     List<BotProductDto> products

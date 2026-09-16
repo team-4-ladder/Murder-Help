@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 import org.example.murderhelp.domain.chat.entity.ChatRoomStatus;
+import org.example.murderhelp.domain.chat.service.ChatCacheRecoveryService;
 import org.example.murderhelp.domain.chat.service.ChatMessageService;
 import org.example.murderhelp.domain.chat.service.ChatRoomService;
 import org.example.murderhelp.global.response.ApiResponse;
@@ -22,6 +23,8 @@ public class ChatRestController {
     private final ChatRoomService chatRoomService;
     private final ChatMessageService chatMessageService;
     private final ChatFacade chatFacade;
+    private final ChatCacheRecoveryService chatCacheRecoveryService;
+
 
     // 1단계: 채팅방 생성 (문의 시작)
     @PostMapping
@@ -59,7 +62,7 @@ public class ChatRestController {
     public ApiResponse<ChatRoomResponse> getRoom(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long roomId) {
-        return ApiResponse.ok(chatRoomService.getRoom(roomId));
+        return ApiResponse.ok(chatRoomService.getRoom(roomId, memberId));
     }
 
     // 2단계: 과거 대화(메시지) 내역 조회 (페이징)
@@ -67,7 +70,7 @@ public class ChatRestController {
     public ApiResponse<Page<ChatMessageResponse>> getMessageHistory(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long roomId, Pageable pageable) {
-        return ApiResponse.ok(chatMessageService.getMessageHistory(roomId, pageable));
+        return ApiResponse.ok(chatMessageService.getMessageHistory(roomId, memberId, pageable));
     }
 
     // 3단계: 상담 종료 처리
@@ -75,7 +78,15 @@ public class ChatRestController {
     public ApiResponse<Void> closeRoom(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long roomId) {
-        chatFacade.closeRoom(roomId);
+        chatFacade.closeRoom(roomId, memberId);
         return ApiResponse.ok();
+    }
+
+    // 관리자 전용: Redis chat_last_messages 수동 복구
+    @PreAuthorize("hasRole('GREEN')")
+    @PostMapping("/cache/recover")
+    public ApiResponse<String> recoverCache() {
+        int count = chatCacheRecoveryService.restore();
+        return ApiResponse.ok(count + "개 채팅방 캐시 복구 완료");
     }
 }

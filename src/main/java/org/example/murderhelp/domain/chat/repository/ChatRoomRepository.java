@@ -13,6 +13,10 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long>, ChatR
 
     boolean existsByCustomerIdAndStatusIn(Long customerId, List<ChatRoomStatus> statuses);
 
+    List<ChatRoom> findAllByStatusNot(ChatRoomStatus status);
+
+    long countByStatusNot(ChatRoomStatus status);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatRoom c SET c.updatedAt = CURRENT_TIMESTAMP WHERE c.id = :roomId")
     void updateLastMessageTime(@Param("roomId") Long roomId);

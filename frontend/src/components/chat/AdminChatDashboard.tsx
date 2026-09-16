@@ -229,9 +229,6 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
               if (room.status === 'WAITING') badgeStyle = 'bg-[#f4f4f5] text-[#18181b] border-[#f4f4f5] shadow-sm';
               else if (room.status === 'COMPLETED') badgeStyle = 'bg-transparent text-[#71717a] border-[#27272a]';
 
-              // 아바타 이니셜 추출 (예: REQ-CUST... -> C)
-              const initial = room.title.replace('REQ-CUST', '').charAt(3).toUpperCase() || '?';
-
               return (
                 <div 
                   key={room.roomId}
@@ -242,9 +239,16 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
                       : 'bg-transparent border-transparent hover:bg-[#27272a]/50'
                   }`}
                 >
-                  {/* 아바타 (Avatar Icon) */}
-                  <div className="w-10 h-10 flex-shrink-0 rounded-full bg-[#3f3f46] flex items-center justify-center text-sm font-bold text-white shadow-inner">
-                    {initial !== '?' ? initial : '👤'}
+                  {/* 프로필 이미지 (Avatar) */}
+                  <div className="w-10 h-10 flex-shrink-0 rounded-full bg-[#240606] border border-[#3f3f46] overflow-hidden flex items-center justify-center shadow-inner">
+                    {room.customerProfileImageUrl ? (
+                      <img src={room.customerProfileImageUrl} alt="profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 100 100" width="24" height="24" aria-label="기본 프로필 이미지">
+                        <circle cx="50" cy="34" r="17" fill="#8b544d" />
+                        <path d="M20 88c4-21 17-31 30-31s26 10 30 31" fill="#8b544d" />
+                      </svg>
+                    )}
                   </div>
                   
                   {/* 메시지 정보 영역 */}
@@ -259,10 +263,12 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className={`text-xs truncate ${isSelected ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
-                        {room.lastMessage ? room.lastMessage : '새로운 대화가 없습니다.'}
+                        {room.status === "COMPLETED"
+                          ? "상담이 종료된 방입니다."
+                          : (room.lastMessage ?? "새로운 대화가 없습니다.")}
                       </span>
                       <span className="text-[9px] text-[#52525b] whitespace-nowrap pl-2">
-                        {new Date(room.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {room.updatedAt.slice(11, 16)}
                       </span>
                     </div>
                   </div>

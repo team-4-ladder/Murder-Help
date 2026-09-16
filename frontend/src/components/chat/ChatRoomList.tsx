@@ -68,31 +68,30 @@ export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin
     }
   };
 
-  if (loading) return <div className="p-4 text-[#a08070] text-sm text-center mt-10" style={{ fontFamily: "Share Tech Mono" }}>Decrypting signals...</div>;
+  if (loading) return <div className="p-4 text-chat-muted text-sm text-center mt-10 font-mono">Decrypting signals...</div>;
 
   return (
     <div className="h-full flex flex-col p-4">
       {/* 텅 빈 상태일 때 혹은 새로운 문의 버튼 */}
         <button 
         onClick={handleStartNew}
-        className="w-full py-3 mb-4 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-[#e83010]"
-        style={{ background: "#cc2200", color: "#fff", border: "1px solid #ff4422", fontFamily: "Share Tech Mono, monospace" }}
+        className="w-full py-3 mb-4 text-sm font-bold tracking-widest uppercase transition-colors hover:bg-chat-primary-hover bg-chat-primary text-white border border-[#ff4422] font-mono"
       >
         [ START 1:1 CHAT ]
       </button>
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <h4 className="text-[#a08070] text-xs mb-3 uppercase tracking-widest font-bold">CHAT HISTORY</h4>
+        <h4 className="text-chat-muted text-xs mb-3 uppercase tracking-widest font-bold">CHAT HISTORY</h4>
         
         {isError ? (
           <div className="text-center mt-20 opacity-80">
-            <svg className="w-12 h-12 mx-auto mb-3 text-[#cc2200]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <p className="text-[#e83010] text-xs font-mono">Failed to connect to the server.<br/>Please try again.</p>
+            <svg className="w-12 h-12 mx-auto mb-3 text-chat-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p className="text-chat-primary-hover text-xs font-mono">Failed to connect to the server.<br/>Please try again.</p>
           </div>
         ) : rooms.length === 0 ? (
           <div className="text-center mt-20 opacity-50">
-            <svg className="w-12 h-12 mx-auto mb-3 text-[#cc2200]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-            <p className="text-[#f0e0d8] text-xs font-mono">No previous chats found.</p>
+            <svg className="w-12 h-12 mx-auto mb-3 text-chat-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+            <p className="text-chat-text-light text-xs font-mono">No previous chats found.</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -100,20 +99,21 @@ export default function ChatRoomList({ customerId, onSelectRoom, preventAutoJoin
               <li 
                 key={room.roomId} 
                 onClick={() => onSelectRoom(room.roomId)}
-                className="p-3 cursor-pointer transition-colors hover:bg-[#1a0000]"
-                style={{ border: "1px solid rgba(204,34,0,0.3)", borderLeftWidth: "4px", borderLeftColor: room.status === "COMPLETED" ? "#444" : "#cc2200" }}
+                className={`p-3 cursor-pointer transition-colors hover:bg-chat-dark border-y border-r border-chat-border border-l-4 ${room.status === "COMPLETED" ? "border-l-[#444]" : "border-l-chat-primary"}`}
               >
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-bold" style={{ color: "#f0e0d8" }}>{room.title}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 font-bold tracking-wider" style={{
-                    background: room.status === "COMPLETED" ? "#333" : "#cc2200",
-                    color: "#fff"
-                  }}>
+                  <span className="text-sm font-bold text-chat-text-light">{room.title}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 font-bold tracking-wider text-white ${room.status === "COMPLETED" ? "bg-[#333]" : "bg-chat-primary"}`}>
                     {room.status}
                   </span>
                 </div>
-                <div className="text-[10px]" style={{ color: "#a08070" }}>
-                  {new Date(room.createdAt).toLocaleString()}
+                <div className="text-[10px] text-chat-muted truncate mb-0.5">
+                  {room.status === "COMPLETED"
+                    ? "상담이 종료된 방입니다."
+                    : (room.lastMessage ?? "")}
+                </div>
+                <div className="text-[10px] text-chat-muted opacity-60">
+                  {room.updatedAt.slice(0, 16).replace('T', ' ')}
                 </div>
               </li>
             ))}
