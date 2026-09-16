@@ -15,20 +15,25 @@ export type MemberInfo = {
     profileImageUrl: string | null;
 };
 
+export type MemberSpendingInfo = {
+    netSpentAmount: number;
+    grade: "YELLOW" | "PURPLE" | "RED" | "GREEN";
+};
+
 async function request<T>(
     url: string,
     options: RequestInit = {},
 ): Promise<T> {
     const response = await authFetch(url, options);
 
-    const body = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+    const body = (await response.json().catch(() => null)) as
+        | ApiResponse<T>
+        | null;
 
-    if (!response.ok) {
-        throw new Error(body?.message ?? "요청 처리에 실패했습니다.");
-    }
-
-    if (!body) {
-        throw new Error("서버 응답을 확인할 수 없습니다.");
+    if (!response.ok || !body || body.code !== "SUCCESS") {
+        throw new Error(
+            body?.message ?? "요청 처리에 실패했습니다.",
+        );
     }
 
     return body.data;
@@ -38,7 +43,16 @@ export function getMyProfile() {
     return request<MemberInfo>("/api/members/me");
 }
 
-export function updateMyProfile(name: string, phone: string) {
+export function getMySpending() {
+    return request<MemberSpendingInfo>(
+        "/api/members/me/spending",
+    );
+}
+
+export function updateMyProfile(
+    name: string,
+    phone: string,
+) {
     return request<MemberInfo>("/api/members/me", {
         method: "PATCH",
         headers: {
@@ -49,19 +63,23 @@ export function updateMyProfile(name: string, phone: string) {
 }
 
 export function deleteProfileImage() {
-    return request<MemberInfo>("/api/members/me/profile-image", {
-        method: "DELETE",
-    });
+    return request<MemberInfo>(
+        "/api/members/me/profile-image",
+        {
+            method: "DELETE",
+        },
+    );
 }
 
 export function uploadProfileImage(image: File) {
     const formData = new FormData();
     formData.append("image", image);
 
-    return request<MemberInfo>("/api/members/me/profile-image", {
-        method: "PATCH",
-        body: formData,
-    });
-    
-    
+    return request<MemberInfo>(
+        "/api/members/me/profile-image",
+        {
+            method: "PATCH",
+            body: formData,
+        },
+    );
 }

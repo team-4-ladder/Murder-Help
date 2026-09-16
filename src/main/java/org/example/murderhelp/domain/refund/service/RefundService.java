@@ -2,6 +2,7 @@ package org.example.murderhelp.domain.refund.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.murderhelp.domain.member.service.MemberSpendingService;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
 import org.example.murderhelp.domain.payment.entity.Payment;
@@ -44,6 +45,7 @@ public class RefundService {
     private final RefundRepository refundRepository;
     private final RefundItemRepository refundItemRepository;
     private final ProductRepository productRepository;
+    private final MemberSpendingService memberSpendingService;
 
     /**
      * 환불 가능한 상품 목록 및 남은 수량 조회 (사용자 화면 출력용)
@@ -218,6 +220,12 @@ public class RefundService {
             refundItem.assignRefund(savedRefund);
         }
         refundItemRepository.saveAll(calcResult.refundItems());
+        
+        // 환불 금액만큼 누적 구매금액 및 회원 등급 차감
+        memberSpendingService.subtractRefundAmount(
+                memberId,
+                calcResult.totalPgRefundAmount()
+        );
 
         return savedRefund;
     }

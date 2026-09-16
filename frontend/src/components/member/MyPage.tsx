@@ -318,51 +318,53 @@ export function MyPage({ onBack }: { onBack: () => void }) {
         setReviewView("write");
     }
 
+
    function openEdit(review: WrittenReview) {
-  setSection("reviews");
+    setSection("reviews");
 
-  setSelected({
-    productCode: review.productCode ?? `상품 #${review.productId}`,
-    productName: review.productName ?? "작성한 리뷰",
-    purchasedAt: review.createdAt,
-  });
+    setSelected({
+        productCode: review.productCode,
+        productName: review.productName,
+        purchasedAt: review.createdAt,
+    });
 
-  setEditingReviewId(review.reviewId);
-  setRating(review.rating);
-  setContent(review.content);
-  setError("");
-  setReviewView("edit");
+    setEditingReviewId(review.reviewId);
+    setRating(review.rating);
+    setContent(review.content);
+    setError("");
+    setReviewView("edit");
 }
 
 function openWriteFromOrder(
-  order: OrderData,
-  item: OrderItemData,
+    _order: OrderData,
+    _item: OrderItemData,
 ) {
-  // 주문내역에서 리뷰 작성 버튼을 누르면 리뷰 관리 화면으로 이동한다.
-  setSection("reviews");
-  setTab("pending");
-
-  openWrite({
-    orderItemId: item.orderItemId,
-    productCode: item.productCode ?? "",
-    productName: item.productName,
-    purchasedAt: order.orderedAt ?? "",
-    imageUrl: item.imageUrl,
-  });
+    /*
+     * 주문내역에서는 특정 상품을 곧바로 작성 화면에 넣지 않고
+     * 리뷰 관리의 작성 가능한 상품 목록으로 이동한다.
+     * /api/reviews/pending 응답의 orderItemId를 사용한다.
+     */
+    setSection("reviews");
+    setTab("pending");
+    setSelected(null);
+    setError("");
+    setReviewView("list");
 }
 
-    function openReviewManagement() {
-        // 한 주문에 여러 상품이 있을 수 있으므로 특정 상품을 바로 열지 않고
-        // 리뷰 작성 가능한 전체 주문상품 목록으로 이동한다.
-        setSection("reviews");
-        setTab("pending");
-        setReviewView("list");
-        setSelected(null);
-        setEditingReviewId(null);
-        setRating(5);
-        setContent("");
-        setError("");
-    }
+function openReviewManagement() {
+    /*
+     * 주문에 여러 상품이 있을 수 있으므로 특정 상품을 바로 열지 않고
+     * 리뷰 작성 가능한 전체 주문상품 목록으로 이동한다.
+     */
+    setSection("reviews");
+    setTab("pending");
+    setReviewView("list");
+    setSelected(null);
+    setEditingReviewId(null);
+    setRating(5);
+    setContent("");
+    setError("");
+}
 
     async function submitReview() {
         if (!selected) return;
