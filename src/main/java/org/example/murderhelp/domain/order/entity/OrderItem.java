@@ -50,12 +50,16 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    public OrderItem(Order order, Product product, int quantity) {
+    private OrderItem(Order order, Product product, int quantity) {
         this.order = order;
         this.product = product;
         this.productName = product.getName();
         this.unitPrice = product.getPrice();
         this.quantity = quantity;
+    }
+
+    public static OrderItem create(Order order, Product product, int quantity) {
+        return new OrderItem(order, product, quantity);
     }
 
 }

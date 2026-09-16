@@ -105,7 +105,7 @@ public class OrderService {
         Order order = Order.create(memberRepository.getReferenceById(memberId), totalAmount, createOrderRequest);
 
         List<OrderItem> orderItemList = cartItemList.stream()
-                .map(cartItem -> new OrderItem(
+                .map(cartItem -> OrderItem.create(
                         order,
                         productMap.get(cartItem.productId()),
                         cartItem.quantity())

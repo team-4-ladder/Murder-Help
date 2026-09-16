@@ -672,8 +672,7 @@ class ReviewServiceTest {
         when(product.getPrice())
                 .thenReturn(15_900L);
 
-        OrderItem orderItem =
-                new OrderItem(order, product, 1);
+        OrderItem orderItem = OrderItem.create(order, product, 1);
 
         ReflectionTestUtils.setField(
                 orderItem,
