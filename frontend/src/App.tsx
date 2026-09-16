@@ -1294,48 +1294,61 @@ export default function App() {
 
       {/* ── FOOTER ──────────────────────────────────── */}
       <footer className="mt-6 border-t" style={{ borderColor: C.panelBorder, background: "rgba(0,0,0,0.7)" }}>
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            {[
-              { h: "SHOP", links: ["Guns", "Weapons", "Bombs", "Gear", "Ammo"] },
-              { h: "SUPPORT", links: ["주문 조회", "반품/교환", "보증", "고객센터", "FAQ"] },
-              { h: "MEMBERSHIP", links: ["Code Red", "Code Purple", "Code Yellow", "등급 안내", "혜택 비교"] },
-              { h: "COMPANY", links: ["About", "Blog", "Careers", "Legal"] },
-            ].map((col) => (
-              <div key={col.h}>
-                <div className="text-[10px] uppercase tracking-[0.2em] mb-3 font-semibold"
-                  style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
-                  {col.h}
-                </div>
-                <ul className="space-y-1.5">
-                  {col.links.map((l) => (
-                    <li key={l}>
-                      <a href="#" className="text-xs transition-colors"
-                        style={{ color: C.textMuted, fontFamily: "Noto Sans KR" }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.text; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.textMuted; }}>
-                        {l}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          <div
-            className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pt-6 border-t text-[10px]"
-            style={{ borderColor: C.panelBorder, color: C.textMuted, fontFamily: "Share Tech Mono" }}
-          >
-            <span>
-              <span style={{ color: C.text, fontFamily: "Cinzel, serif", fontSize: 13 }}>MurderHelp</span>
-              {" "}© 2026 All rights reserved.
+        <div
+          className="w-full py-1.5 text-center text-[10px] uppercase tracking-[0.3em] border-b opacity-40"
+          style={{
+            color: C.yellowBright,
+            fontFamily: "Share Tech Mono",
+            borderColor: C.panelBorder,
+            background:
+              "repeating-linear-gradient(45deg, rgba(232,48,16,0.12) 0 10px, rgba(0,0,0,0.35) 10px 20px)",
+          }}
+        >
+          ⚠️ TOY PROJECT AREA - DO NOT CROSS ⚠️
+        </div>
+
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10 flex flex-col items-center text-center">
+          <div>
+            <span style={{ fontFamily: "Cinzel, serif" }} className="text-sm font-medium text-neutral-400">
+              MURDERHELP
             </span>
-            <div className="flex items-center gap-3">
-              <span>BB탄 전용 · 만 18세 이상</span>
-              <span className="px-2 py-0.5" style={{ border: `1px solid ${C.panelBorder}`, color: C.red }}>
-                AIRSOFT ONLY
-              </span>
-            </div>
+            <span style={{ fontFamily: "Share Tech Mono" }} className="text-xs text-neutral-500 ml-2">
+              | Murder Mystery Assistant &amp; Toolkit
+            </span>
+          </div>
+
+          <p
+            className="text-xs italic mt-2 text-neutral-500"
+            style={{ fontFamily: "Noto Sans KR" }}
+          >
+            "모든 트릭에는 빈틈이 있고, 모든 코드에는 버그가 있다."
+          </p>
+
+          <div className="flex items-center gap-3 mt-4 text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/tree/main"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              도구 열람 (GitHub)
+            </a>
+            <span className="text-neutral-600">·</span>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              결함 제보 (Report Bug)
+            </a>
+          </div>
+
+          <div
+            className="w-full pt-6 mt-8 border-t text-[11px] text-neutral-600"
+            style={{ borderColor: C.panelBorder, fontFamily: "Share Tech Mono" }}
+          >
+            © 2026 murderhelp.dev. Crafted for mystery lovers. · 현실의 긴급 상황은 112로 신고해 주세요.
           </div>
         </div>
       </footer>
