@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
-import type { ChatMessageResponse } from "./chat.types";
+import type { ChatMessageResponse, ChatRoomResponse, ChatRoomStatus } from "./chat.types";
 import { getAccessToken } from "../../api/client";
+import { subscribeChatSocket, onChatSocketReconnect, isChatSocketConnected, publishChatSocket } from "./chatSocket";
 
 export function useChatRoom(roomId: number) {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
@@ -10,17 +9,17 @@ export function useChatRoom(roomId: number) {
   const [isLast, setIsLast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [status, setStatus] = useState<string>("BOT_MODE");
+  const [status, setStatus] = useState<ChatRoomStatus>("BOT_MODE");
   const [isError, setIsError] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
-  const stompClient = useRef<Client | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number>(0);
   const isFetchingHistory = useRef(false);
   const isInitialMount = useRef(true);
+  const pendingScrollTimeouts = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
-  // 1. 초기 데이터 및 상태 조회, STOMP 연결
+  // 1. 초기 데이터 및 상태 조회, STOMP 구독
   useEffect(() => {
     fetch(`/api/chat/rooms/${roomId}`, {
       headers: { Authorization: `Bearer ${getAccessToken()}` }
@@ -36,54 +35,53 @@ export function useChatRoom(roomId: number) {
 
     loadMoreMessages(0, true);
 
-    const client = new Client({
-      webSocketFactory: () => new SockJS("/ws"),
-      connectHeaders: {
-        Authorization: `Bearer ${getAccessToken()}`
-      },
-      debug: (str) => console.log(str),
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe(`/sub/chat/room/${roomId}`, (msg) => {
-          const newMsg = JSON.parse(msg.body) as ChatMessageResponse;
-          setMessages(prev => [...prev, newMsg]);
-          
-          if (newMsg.messageType === "SYSTEM" && newMsg.content.includes("[CLOSED]")) {
+    const unsubscribeMessages = subscribeChatSocket(`/sub/chat/room/${roomId}`, (body) => {
+      const newMsg = JSON.parse(body) as ChatMessageResponse;
+      setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+
+      if (newMsg.messageType === "SYSTEM" && newMsg.content.includes("[CLOSED]")) {
+        setIsCompleted(true);
+      }
+
+      const timeoutId = setTimeout(() => {
+         pendingScrollTimeouts.current.delete(timeoutId);
+         if (containerRef.current) {
+            containerRef.current.scrollTo({
+              top: containerRef.current.scrollHeight,
+              behavior: "auto"
+            });
+         }
+      }, 50);
+      pendingScrollTimeouts.current.add(timeoutId);
+    });
+
+    // 실시간 방 상태 업데이트 구독 (상담사 연결 등으로 상태가 변경될 때 즉각 반영)
+    const unsubscribeRoomUpdates = subscribeChatSocket('/sub/chat/rooms/updates', (body) => {
+      try {
+        const updatedRoom = JSON.parse(body) as ChatRoomResponse;
+        if (updatedRoom.roomId === roomId) {
+          setStatus(updatedRoom.status);
+          if (updatedRoom.status === "COMPLETED") {
             setIsCompleted(true);
           }
-
-          setTimeout(() => {
-             if (containerRef.current) {
-                containerRef.current.scrollTo({
-                  top: containerRef.current.scrollHeight,
-                  behavior: "auto"
-                });
-             }
-          }, 50);
-        });
-
-        // 실시간 방 상태 업데이트 구독 (상담사 연결 등으로 상태가 변경될 때 즉각 반영)
-        client.subscribe('/sub/chat/rooms/updates', (msg) => {
-          try {
-            const updatedRoom = JSON.parse(msg.body);
-            if (updatedRoom.roomId === roomId) {
-              setStatus(updatedRoom.status);
-              if (updatedRoom.status === "COMPLETED") {
-                setIsCompleted(true);
-              }
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        });
+        }
+      } catch (e) {
+        console.error(e);
       }
     });
 
-    client.activate();
-    stompClient.current = client;
+    // 재연결된 경우, 끊겨 있던 동안 놓쳤을 수 있는 메시지를 최신 페이지로 다시 채운다.
+    const unsubscribeReconnect = onChatSocketReconnect(() => {
+      isInitialMount.current = true;
+      loadMoreMessages(0, true);
+    });
 
-    return () => { 
-      client.deactivate(); 
+    return () => {
+      unsubscribeMessages();
+      unsubscribeRoomUpdates();
+      unsubscribeReconnect();
+      pendingScrollTimeouts.current.forEach(id => clearTimeout(id));
+      pendingScrollTimeouts.current.clear();
     };
   }, [roomId]);
 
@@ -157,11 +155,8 @@ export function useChatRoom(roomId: number) {
   };
 
   const sendMessage = (customerId: number, content: string) => {
-    if (!content.trim() || isCompleted || !stompClient.current?.connected) return;
-    stompClient.current.publish({
-      destination: "/pub/chat.send",
-      body: JSON.stringify({ roomId, memberId: customerId, content })
-    });
+    if (!content.trim() || isCompleted || !isChatSocketConnected()) return;
+    publishChatSocket("/pub/chat.send", JSON.stringify({ roomId, memberId: customerId, content }));
   };
 
   return {

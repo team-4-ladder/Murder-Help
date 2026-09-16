@@ -1,4 +1,6 @@
-export type ChatRoomStatus = "WAITING" | "IN_PROGRESS" | "COMPLETED";
+import type { Member } from "../../api/auth";
+
+export type ChatRoomStatus = "BOT_MODE" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 
 export interface ChatRoomResponse {
   roomId: number;
@@ -8,6 +10,9 @@ export interface ChatRoomResponse {
   updatedAt: string;
   lastMessage?: string;
   customerProfileImageUrl?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerGrade?: Member["grade"] | null;
 }
 
 export type ChatMessageType = "TEXT" | "SYSTEM" | "BUTTON";
@@ -18,10 +23,10 @@ export interface ChatMessageResponse {
   memberId: number;
   senderEmail: string;
   senderName: string;
-  senderGrade?: string;
+  senderGrade?: Member["grade"];
   senderProfileImageUrl?: string | null;
   content: string;
-  messageType: "TEXT" | "SYSTEM" | "BUTTON";
+  messageType: ChatMessageType;
   createdAt: string;
 }
 

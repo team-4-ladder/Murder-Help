@@ -35,7 +35,7 @@ export default function ChatModal({ customerId, onClose }: { customerId: number;
       {/* Body: List or Room View */}
       <div className="flex-1 overflow-hidden relative">
         {activeRoomId ? (
-          <ChatRoomView roomId={activeRoomId} customerId={customerId} />
+          <ChatRoomView key={activeRoomId} roomId={activeRoomId} customerId={customerId} />
         ) : (
           <ChatRoomList customerId={customerId} onSelectRoom={setActiveRoomId} preventAutoJoin={preventAutoJoin} />
         )}
