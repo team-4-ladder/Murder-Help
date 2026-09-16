@@ -144,7 +144,7 @@ public class CartService {
 
     private List<Long> getDistinctIds(List<Long> ids) {
         if (ids == null || ids.stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException("장바구니 상품 ID는 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "장바구니 상품 ID는 필수입니다.");
         }
         return ids.stream().distinct().toList();
     }

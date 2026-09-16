@@ -58,7 +58,7 @@ public class Product {
 
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("차감 수량은 1 이상이어야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "차감 수량은 1 이상이어야 합니다.");
         }
 
         if (this.status != ProductStatus.ON_SALE) {
@@ -76,7 +76,7 @@ public class Product {
 
     public void restoreStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("복구 수량은 1 이상이어야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "복구 수량은 1 이상이어야 합니다.");
         }
 
         this.stockQuantity = Math.addExact(this.stockQuantity, quantity);

@@ -11,6 +11,8 @@ import org.example.murderhelp.domain.product.entity.ProductTier;
 import org.example.murderhelp.domain.product.entity.QCategory;
 import org.example.murderhelp.domain.product.entity.QProduct;
 import org.example.murderhelp.domain.product.entity.QProductSpec;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -152,7 +154,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             case "id" -> new OrderSpecifier<>(direction, product.id);
             case "price" -> new OrderSpecifier<>(direction, product.price);
             case "productCode" -> new OrderSpecifier<>(direction, product.productCode);
-            default -> throw new IllegalArgumentException(
+            default -> throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
                     "지원하지 않는 상품 정렬 필드입니다: " + sortOrder.getProperty()
             );
         };
