@@ -13,8 +13,8 @@ public enum ChatRoomStatus {
             return true;
         }
     },
-    WAITING,      // 기본 동작 사용
-    IN_PROGRESS,  // 기본 동작 사용
+    WAITING,
+    IN_PROGRESS,
     COMPLETED {
         @Override
         public boolean canSendMessage(boolean isCustomer) {
@@ -29,17 +29,15 @@ public enum ChatRoomStatus {
         }
     };
 
-    // --- Default Methods (기본적으로 허용되는 동작들을 정의) ---
-
     public boolean canSendMessage(boolean isCustomer) {
-        return true; // WAITING, IN_PROGRESS의 기본 동작
+        return true;
     }
 
     public boolean canClose() {
-        return true; // BOT_MODE, WAITING, IN_PROGRESS의 기본 동작
+        return true;
     }
 
     public boolean isBotActive() {
-        return false; // BOT_MODE 외의 기본 동작
+        return false;
     }
 }

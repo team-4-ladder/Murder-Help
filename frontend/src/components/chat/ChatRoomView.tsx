@@ -38,15 +38,19 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff4422] animate-pulse"></span>
             SYSTEM ONLINE
           </span>
-          <button 
+          <button
             onClick={() => {
               if (window.confirm("현재 통신을 완전히 종료하시겠습니까?")) {
-                fetch(`/api/chat/rooms/${roomId}/close`, { 
+                fetch(`/api/chat/rooms/${roomId}/close`, {
                   method: "PATCH",
                   headers: {
                     Authorization: `Bearer ${getAccessToken()}`
                   }
-                });
+                })
+                  .then(res => {
+                    if (!res.ok) throw new Error("채널 닫기 실패");
+                  })
+                  .catch(err => alert(err.message));
               }
             }}
             className="text-[10px] font-bold px-3 py-1 rounded transition-colors uppercase tracking-widest border border-chat-primary text-[#ff4422] hover:bg-chat-primary hover:text-white bg-black/50 font-mono"

@@ -12,7 +12,10 @@ public record ChatRoomResponse(
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     String lastMessage,
-    String customerProfileImageUrl
+    String customerProfileImageUrl,
+    String customerName,
+    String customerEmail,
+    String customerGrade
 ) {
     public static ChatRoomResponse from(ChatRoom chatRoom) {
         return from(chatRoom, null);
@@ -26,7 +29,10 @@ public record ChatRoomResponse(
             chatRoom.getCreatedAt(),
             chatRoom.getUpdatedAt(),
             lastMessage,
-            chatRoom.getCustomer() != null ? chatRoom.getCustomer().getProfileImageUrl() : null
+            chatRoom.getCustomer() != null ? chatRoom.getCustomer().getProfileImageUrl() : null,
+            chatRoom.getCustomer() != null ? chatRoom.getCustomer().getName() : null,
+            chatRoom.getCustomer() != null ? chatRoom.getCustomer().getEmail() : null,
+            chatRoom.getCustomer() != null ? chatRoom.getCustomer().getGrade().name() : null
         );
     }
 }

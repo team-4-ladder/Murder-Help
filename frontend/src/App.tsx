@@ -1220,159 +1220,171 @@ export default function App() {
                 <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
               상품 상세정보를 불러오는 중...
             </span>
-              </div>
-            </div>
-        )}
+          </div>
+        </div>
+      )}
 
-        {session && view.name === "detail" && !detailLoading && detailError && (
-            <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
-              <div
-                  className="max-w-md mx-auto p-10 text-center"
-                  style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+
+      {session && view.name === "detail" && !detailLoading && detailError && (
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
+          <div
+            className="max-w-md mx-auto p-10 text-center"
+            style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+          >
+            <div className="text-xl font-bold uppercase mb-3" style={{ fontFamily: "Cinzel, serif", color: C.text }}>
+              Load Failed
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif", fontWeight: 300 }}>
+              {detailError}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate({ name: "list" })}
+                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest"
+                style={{ color: C.textDim, border: `1px solid ${C.panelBorder}`, fontFamily: "Share Tech Mono" }}
               >
-                <div className="text-xl font-bold uppercase mb-3" style={{ fontFamily: "Cinzel, serif", color: C.text }}>
-                  Load Failed
-                </div>
-                <p className="text-sm leading-relaxed mb-6" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif", fontWeight: 300 }}>
-                  {detailError}
-                </p>
-                <div className="flex gap-3">
-                  <button
-                      onClick={() => navigate({ name: "list" })}
-                      className="flex-1 py-3 text-sm font-bold uppercase tracking-widest"
-                      style={{ color: C.textDim, border: `1px solid ${C.panelBorder}`, fontFamily: "Share Tech Mono" }}
-                  >
-                    목록으로
-                  </button>
-                  <button
-                      onClick={() => setDetailReloadKey((key) => key + 1)}
-                      className="flex-1 py-3 text-sm font-bold uppercase tracking-widest"
-                      style={{ background: C.red, color: "#fff", border: `1px solid ${C.redBright}`, fontFamily: "Share Tech Mono" }}
-                  >
-                    다시 시도
-                  </button>
-                </div>
-              </div>
-            </div>
-        )}
-
-        {session && view.name === "detail" && detailProduct && detailAllowed && (
-            <ProductDetail
-                p={detailProduct}
-                onBack={() => navigate({ name: "list" })}
-                onAddToCart={(qty) => addToCart(detailProduct.id, qty)}
-            />
-        )}
-
-        {session && view.name === "detail" && detailProduct && !detailAllowed && (
-            <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
-              <div className="max-w-md mx-auto p-10 text-center" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
-                <div className="text-xl font-bold uppercase mb-3" style={{ fontFamily: "Cinzel, serif", color: C.text }}>
-                  Locked
-                </div>
-                <p className="text-sm leading-relaxed mb-6" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif", fontWeight: 300 }}>
-                  {TIERS[detailProduct.tier].label} 등급부터 보실 수 있는 상품입니다.
-                </p>
-                <button
-                    onClick={() => navigate({ name: "list" })}
-                    className="w-full py-3 text-sm font-bold uppercase tracking-widest"
-                    style={{ background: C.red, color: "#fff", border: `1px solid ${C.redBright}`, fontFamily: "Share Tech Mono" }}
-                >
-                  목록으로 →
-                </button>
-              </div>
-            </div>
-        )}
-
-        {session && authReady && view.name === "mypage" && (
-            <MyPage onBack={() => navigate({ name: "list" })} />
-        )}
-
-        {session && authReady && userTier === "green" && view.name === "admin" && (
-            <ProductRankingAdmin onBack={() => navigate({ name: "list" })} />
-        )}
-
-        {session && authReady && view.name === "cart" && (
-            <CartView
-                lines={cartLines}
-                loading={cartLoading}
-                error={cartError}
-                pendingIds={cartPendingIds}
-                selectedIds={selectedCartIds}
-                onQty={setQty}
-                onRemove={removeLine}
-                onRemoveSelected={removeSelectedLines}
-                onSelect={selectCartItem}
-                onSelectAll={selectAllCartItems}
-                onRetry={() => setCartReloadKey((key) => key + 1)}
-                onContinue={() => navigate({ name: "list" })}
-                onCheckout={goCheckout}
-            />
-        )}
-
-        {session && authReady && view.name === "checkout" && (
-            <CheckoutView
-                lines={selectedCartLines}
-                cartItemIds={selectedCartLineIds}
-                onBack={() => navigate({ name: "cart" })}
-                onDone={finishOrder}
-            />
-        )}
-
-        {session && view.name === "done" && (
-            <OrderDone orderNo={view.orderNo} total={view.total} onHome={() => navigate({ name: "list" })} />
-        )}
-
-        {/* ── FOOTER ──────────────────────────────────── */}
-        <footer className="mt-6 border-t" style={{ borderColor: C.panelBorder, background: "rgba(0,0,0,0.7)" }}>
-          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-              {[
-                { h: "SHOP", links: ["Guns", "Weapons", "Bombs", "Gear", "Ammo"] },
-                { h: "SUPPORT", links: ["주문 조회", "반품/교환", "보증", "고객센터", "FAQ"] },
-                { h: "MEMBERSHIP", links: ["Code Red", "Code Purple", "Code Yellow", "등급 안내", "혜택 비교"] },
-                { h: "COMPANY", links: ["About", "Blog", "Careers", "Legal"] },
-              ].map((col) => (
-                  <div key={col.h}>
-                    <div className="text-[10px] uppercase tracking-[0.2em] mb-3 font-semibold"
-                         style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
-                      {col.h}
-                    </div>
-                    <ul className="space-y-1.5">
-                      {col.links.map((l) => (
-                          <li key={l}>
-                            <a href="#" className="text-xs transition-colors"
-                               style={{ color: C.textMuted, fontFamily: "Noto Sans KR" }}
-                               onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.text; }}
-                               onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.textMuted; }}>
-                              {l}
-                            </a>
-                          </li>
-                      ))}
-                    </ul>
-                  </div>
-              ))}
-            </div>
-            <div
-                className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pt-6 border-t text-[10px]"
-                style={{ borderColor: C.panelBorder, color: C.textMuted, fontFamily: "Share Tech Mono" }}
-            >
-            <span>
-              <span style={{ color: C.text, fontFamily: "Cinzel, serif", fontSize: 13 }}>MurderHelp</span>
-              {" "}© 2026 All rights reserved.
-            </span>
-              <div className="flex items-center gap-3">
-                <span>BB탄 전용 · 만 18세 이상</span>
-                <span className="px-2 py-0.5" style={{ border: `1px solid ${C.panelBorder}`, color: C.red }}>
-                AIRSOFT ONLY
-              </span>
-              </div>
+                목록으로
+              </button>
+              <button
+                onClick={() => setDetailReloadKey((key) => key + 1)}
+                className="flex-1 py-3 text-sm font-bold uppercase tracking-widest"
+                style={{ background: C.red, color: "#fff", border: `1px solid ${C.redBright}`, fontFamily: "Share Tech Mono" }}
+              >
+                다시 시도
+              </button>
             </div>
           </div>
-        </footer>
-        {session && <FloatingChatWidget customerId={Number(session.id)} isAdmin={userTier === "green"} />}
-      </div>
+        </div>
+      )}
+
+      {session && view.name === "detail" && detailProduct && detailAllowed && (
+        <ProductDetail
+          p={detailProduct}
+          onBack={() => navigate({ name: "list" })}
+          onAddToCart={(qty) => addToCart(detailProduct.id, qty)}
+        />
+      )}
+
+      {session && view.name === "detail" && detailProduct && !detailAllowed && (
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
+          <div className="max-w-md mx-auto p-10 text-center" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
+            <div className="text-xl font-bold uppercase mb-3" style={{ fontFamily: "Cinzel, serif", color: C.text }}>
+              Locked
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif", fontWeight: 300 }}>
+              {TIERS[detailProduct.tier].label} 등급부터 보실 수 있는 상품입니다.
+            </p>
+            <button
+              onClick={() => navigate({ name: "list" })}
+              className="w-full py-3 text-sm font-bold uppercase tracking-widest"
+              style={{ background: C.red, color: "#fff", border: `1px solid ${C.redBright}`, fontFamily: "Share Tech Mono" }}
+            >
+              목록으로 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {session && authReady && view.name === "mypage" && (
+        <MyPage onBack={() => navigate({ name: "list" })} />
+      )}
+
+      {session && authReady && userTier === "green" && view.name === "admin" && (
+        <ProductRankingAdmin onBack={() => navigate({ name: "list" })} />
+      )}
+
+      {session && authReady && view.name === "cart" && (
+        <CartView
+          lines={cartLines}
+          loading={cartLoading}
+          error={cartError}
+          pendingIds={cartPendingIds}
+          selectedIds={selectedCartIds}
+          onQty={setQty}
+          onRemove={removeLine}
+          onRemoveSelected={removeSelectedLines}
+          onSelect={selectCartItem}
+          onSelectAll={selectAllCartItems}
+          onRetry={() => setCartReloadKey((key) => key + 1)}
+          onContinue={() => navigate({ name: "list" })}
+          onCheckout={goCheckout}
+        />
+      )}
+
+      {session && authReady && view.name === "checkout" && (
+        <CheckoutView
+          lines={selectedCartLines}
+          cartItemIds={selectedCartLineIds}
+          onBack={() => navigate({ name: "cart" })}
+          onDone={finishOrder}
+        />
+      )}
+
+      {session && view.name === "done" && (
+        <OrderDone orderNo={view.orderNo} total={view.total} onHome={() => navigate({ name: "list" })} />
+      )}
+
+      {/* ── FOOTER ──────────────────────────────────── */}
+      <footer className="mt-6 border-t" style={{ borderColor: C.panelBorder, background: "rgba(0,0,0,0.7)" }}>
+        <div
+          className="w-full py-1.5 text-center text-[10px] uppercase tracking-[0.3em] border-b opacity-40"
+          style={{
+            color: C.yellowBright,
+            fontFamily: "Share Tech Mono",
+            borderColor: C.panelBorder,
+            background:
+              "repeating-linear-gradient(45deg, rgba(232,48,16,0.12) 0 10px, rgba(0,0,0,0.35) 10px 20px)",
+          }}
+        >
+          ⚠️ TOY PROJECT AREA - DO NOT CROSS ⚠️
+        </div>
+
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10 flex flex-col items-center text-center">
+          <div>
+            <span style={{ fontFamily: "Cinzel, serif" }} className="text-sm font-medium text-neutral-400">
+              MURDERHELP
+            </span>
+            <span style={{ fontFamily: "Share Tech Mono" }} className="text-xs text-neutral-500 ml-2">
+              | Murder Mystery Assistant &amp; Toolkit
+            </span>
+          </div>
+
+          <p
+            className="text-xs italic mt-2 text-neutral-500"
+            style={{ fontFamily: "Noto Sans KR" }}
+          >
+            "모든 트릭에는 빈틈이 있고, 모든 코드에는 버그가 있다."
+          </p>
+
+          <div className="flex items-center gap-3 mt-4 text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/tree/main"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              도구 열람 (GitHub)
+            </a>
+            <span className="text-neutral-600">·</span>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              결함 제보 (Report Bug)
+            </a>
+          </div>
+
+          <div
+            className="w-full pt-6 mt-8 border-t text-[11px] text-neutral-600"
+            style={{ borderColor: C.panelBorder, fontFamily: "Share Tech Mono" }}
+          >
+            © 2026 murderhelp.dev. Crafted for mystery lovers. · 현실의 긴급 상황은 112로 신고해 주세요.
+          </div>
+        </div>
+      </footer>
+      {session && <FloatingChatWidget customerId={Number(session.id)} isAdmin={userTier === "green"} />}
+    </div>
   );
 }
-
-
