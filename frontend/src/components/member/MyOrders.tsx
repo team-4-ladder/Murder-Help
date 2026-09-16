@@ -57,7 +57,8 @@ export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
-  const [detail, setDetail] = useState<OrderData | null>(null);
+  /* 상세는 orderId 만 넘기고 상세 화면이 직접 조회한다 */
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   /* 기간·상태·페이지가 바뀌는 순간 바로 서버에 다시 조회한다 */
   useEffect(() => {
@@ -115,17 +116,18 @@ export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
     window.scrollTo({ top: 0 });
   }
 
-  function openDetail(order: OrderData) {
-    setDetail(order);
+  function openDetail(orderId: number) {
+    setDetailId(orderId);
     window.scrollTo({ top: 0 });
   }
 
-  if (detail) {
+  if (detailId !== null) {
     return (
         <OrderDetail
-            order={detail}
-            onBack={() => setDetail(null)}
-            onOrderUpdated={(updated) => setDetail(updated)}
+            orderId={detailId}
+            onBack={() => setDetailId(null)}
+            /* 환불로 주문이 바뀌면 목록도 최신 상태로 맞춰 둔다 */
+            onOrderUpdated={() => setReloadKey((key) => key + 1)}
         />
     );
   }
@@ -228,7 +230,7 @@ export function MyOrders({ onShop, onWriteReview, refreshKey = 0 }: Props) {
                   <OrderCard
                       key={order.orderNumber}
                       order={order}
-                      onOpenDetail={() => openDetail(order)}
+                      onOpenDetail={() => openDetail(order.orderId)}
                       onWriteReview={onWriteReview}
                   />
               ))}

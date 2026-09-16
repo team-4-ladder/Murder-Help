@@ -3,6 +3,7 @@ import { fetchOrder, type OrderData, type OrderStatus } from "../../api/orders";
 import { fetchRefundHistory, type RefundHistory } from "../../api/refund";
 import { formatDate, formatDateTime, ORDER_STATUS_LABEL, orderStatusStyle } from "../../lib/order";
 import { C, krw } from "../../lib/theme";
+import { Spinner } from "../common/Spinner";
 import { OrderItemRow } from "./OrderItemRow";
 import { RefundModal } from "./RefundModal";
 
@@ -18,48 +19,113 @@ const REFUND_STATUS_LABEL: Record<RefundHistory["status"], string> = {
 };
 
 export function OrderDetail({
-                              order,
+                              orderId,
                               onBack,
                               onOrderUpdated,
                             }: {
-  order: OrderData;
+  orderId: number;
   onBack: () => void;
-  onOrderUpdated: (updated: OrderData) => void;
+  /* 환불로 주문이 바뀌었을 때 — 바깥 목록도 다시 불러오도록 알린다 */
+  onOrderUpdated?: () => void;
 }) {
-  const [showRefund, setShowRefund] = useState(false);
+  const [order, setOrder] = useState<OrderData | null>(null);
   const [refunds, setRefunds] = useState<RefundHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [showRefund, setShowRefund] = useState(false);
 
+  /* 상세 화면에 들어오면 목록에서 받아 둔 값을 쓰지 않고 상세 API 로 새로 조회한다.
+     환불 내역은 주문에 딸린 paymentId 가 있어야 부를 수 있어서 주문을 받은 뒤에 이어서 부른다 */
   useEffect(() => {
-    let active = true;
-    fetchRefundHistory(order.paymentId)
-        .then((history) => {
-          if (active) setRefunds(history);
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+
+    async function load() {
+      const detail = await fetchOrder(orderId, controller.signal);
+      if (controller.signal.aborted) return;
+      setOrder(detail);
+
+      /* 환불 내역은 없어도 상세는 보여 줘야 하니 실패해도 넘어간다 */
+      const history = await fetchRefundHistory(detail.paymentId).catch(() => []);
+      if (!controller.signal.aborted) setRefunds(history);
+    }
+
+    load()
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setOrder(null);
+          setError(error instanceof Error ? error.message : "주문 정보를 불러오지 못했습니다.");
         })
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [order.paymentId]);
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+
+    return () => controller.abort();
+  }, [orderId, reloadKey]);
+
+  /* 환불하면 주문 상태·금액이 바뀌므로 상세를 통째로 다시 조회한다 */
+  function refreshAfterRefund() {
+    setShowRefund(false);
+    setReloadKey((key) => key + 1);
+    onOrderUpdated?.();
+  }
+
+  const backButton = (
+      <button type="button" onClick={onBack} className="text-xs mb-5" style={{ color: C.textMuted }}>
+        ← 주문 내역으로
+      </button>
+  );
+
+  if (loading) {
+    return (
+        <>
+          {backButton}
+          <div
+              className="flex items-center justify-center gap-3 py-16"
+              style={{ border: `1px dashed ${C.panelBorder}`, color: C.textDim }}
+          >
+            <Spinner color={C.redBright} />
+            <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+            주문 정보를 불러오는 중...
+          </span>
+          </div>
+        </>
+    );
+  }
+
+  if (!order) {
+    return (
+        <>
+          {backButton}
+          <div
+              className="flex items-center justify-between gap-4 px-4 py-3"
+              style={{ border: `1px solid ${C.redDim}` }}
+          >
+            <p className="text-xs" style={{ color: C.redBright, fontFamily: "Noto Sans KR, sans-serif" }}>
+              {error || "주문 정보를 불러오지 못했습니다."}
+            </p>
+            <button
+                type="button"
+                onClick={() => setReloadKey((key) => key + 1)}
+                className="shrink-0 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: C.text, border: `1px solid ${C.panelBorder}`, fontFamily: "Share Tech Mono" }}
+            >
+              다시 시도
+            </button>
+          </div>
+        </>
+    );
+  }
 
   const itemsTotal = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const quantityTotal = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const canceled = order.status === "CANCELED";
 
-  async function refreshAfterRefund() {
-    setShowRefund(false);
-    const [updatedOrder, history] = await Promise.all([
-      fetchOrder(order.orderId),
-      fetchRefundHistory(order.paymentId),
-    ]);
-    onOrderUpdated(updatedOrder);
-    setRefunds(history);
-  }
-
   return (
       <>
-        <button type="button" onClick={onBack} className="text-xs mb-5" style={{ color: C.textMuted }}>
-          ← 주문 내역으로
-        </button>
+        {backButton}
 
         <div style={{ border: `1px solid ${C.panelBorder}`, background: "rgba(0,0,0,0.18)" }}>
           <section className="px-6 py-5" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
