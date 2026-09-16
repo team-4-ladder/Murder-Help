@@ -3,7 +3,7 @@ package org.example.murderhelp.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
-import org.example.murderhelp.domain.chat.redis.ChatRedisPublisher;
+import org.example.murderhelp.domain.chat.entity.ChatRoom;
 import org.example.murderhelp.domain.chat.service.ChatMessageService;
 import org.example.murderhelp.domain.chat.service.ChatRoomService;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,6 @@ public class ChatFacade {
 
     private final ChatRoomService chatRoomService;
     private final ChatMessageService chatMessageService;
-    private final ChatRedisPublisher chatRedisPublisher;
 
     /**
      * 방 생성 + 챗봇 첫 인사 발송 오케스트레이션
@@ -37,12 +36,15 @@ public class ChatFacade {
     /**
      * 방 닫기 + 종료 시스템 메시지 발송 오케스트레이션
      */
-    public void closeRoom(Long roomId) {
+    public void closeRoom(Long roomId, Long memberId) {
         log.info("========== [채팅방 종료 파사드 진입] ==========");
-        
+
+        ChatRoom room = chatRoomService.getRoomEntity(roomId);
+        chatRoomService.validateRoomAccess(room, memberId);
+
         chatRoomService.closeRoom(roomId);
         chatMessageService.sendCloseSystemMessage(roomId);
-        
+
         log.info("채팅방 종료 및 시스템 메시지 발송 완료. Room ID: {}", roomId);
     }
 }

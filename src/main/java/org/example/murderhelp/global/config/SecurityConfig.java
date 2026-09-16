@@ -43,6 +43,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/reissue").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/webhooks/portone").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/searches/popular").permitAll()
                         .requestMatchers("/ws/**").permitAll() // 웹소켓 연결 자체는 열어두고 StompAuthInterceptor가 검증
                         .requestMatchers("/error").permitAll()

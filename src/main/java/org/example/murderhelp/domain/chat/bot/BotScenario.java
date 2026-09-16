@@ -13,14 +13,14 @@ public enum BotScenario {
     
     WELCOME(
         BotMessageDto.builder()
-            .text("MurderHelp 고객 지원 센터에 오신 것을 환영합니다.\n원하시는 항목을 선택해 주세요.")
+            .title("MurderHelp 고객 지원 센터에 오신 것을 환영합니다.\n원하시는 항목을 선택해 주세요.")
             .options(Constants.MAIN_MENU_OPTIONS)
             .build()
     ),
     
     FALLBACK(
         BotMessageDto.builder()
-            .text("버튼을 통해 원하시는 항목을 선택해 주세요.")
+            .title("버튼을 통해 원하시는 항목을 선택해 주세요.")
             .options(Constants.MAIN_MENU_OPTIONS)
             .build()
     );

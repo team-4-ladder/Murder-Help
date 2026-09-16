@@ -5,7 +5,9 @@ export interface ChatRoomResponse {
   title: string;
   status: ChatRoomStatus;
   createdAt: string;
+  updatedAt: string;
   lastMessage?: string;
+  customerProfileImageUrl?: string | null;
 }
 
 export type ChatMessageType = "TEXT" | "SYSTEM" | "BUTTON";
@@ -17,6 +19,7 @@ export interface ChatMessageResponse {
   senderEmail: string;
   senderName: string;
   senderGrade?: string;
+  senderProfileImageUrl?: string | null;
   content: string;
   messageType: "TEXT" | "SYSTEM" | "BUTTON";
   createdAt: string;
@@ -44,7 +47,8 @@ export interface BotProductDto {
 }
 
 export interface BotMessageDto {
-  text: string;
+  title?: string;
+  text?: string;
   options?: BotOptionDto[];
   products?: BotProductDto[];
 }

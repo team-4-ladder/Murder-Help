@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.example.murderhelp.domain.chat.dto.ChatMessageResponse;
+import org.example.murderhelp.domain.chat.dto.ChatRoomResponse;
 
 @Component
 @RequiredArgsConstructor
@@ -18,7 +19,7 @@ public class ChatRedisPublisher {
     }
 
     // 관리자 토픽으로 채팅방 상태/생성 이벤트 발행
-    public void publishRoomUpdate(org.example.murderhelp.domain.chat.dto.ChatRoomResponse response) {
+    public void publishRoomUpdate(ChatRoomResponse response) {
         String topic = "chat-room:updates";
         redisTemplate.convertAndSend(topic, response);
     }

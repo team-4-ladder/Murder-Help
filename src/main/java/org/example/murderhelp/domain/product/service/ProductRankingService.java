@@ -26,6 +26,30 @@ public class ProductRankingService {
     public static final String RANKING_TARGET_KEY_PREFIX = "ranking:weekly:best:";
     private static final String RANKING_TEMP_KEY_PREFIX = "ranking:weekly:best:temp:";
 
+    /**
+     * 기동 시 조건부 워밍업 — RankingWarmupListener에 의해 호출됨 (test 프로파일 제외)
+     * 등급별 Redis 키가 하나라도 없을 때만 updateWeeklyBestProducts() 실행
+     */
+    public void warmUpOnStartup() {
+        log.info("[랭킹 워밍업] 서버 기동 — Redis 랭킹 캐시 상태 확인 중...");
+
+        boolean anyMissing = Arrays.stream(ProductTier.values())
+                .filter(tier -> tier != ProductTier.GREEN)
+                .anyMatch(tier -> {
+                    String key = RANKING_TARGET_KEY_PREFIX + tier.name().toLowerCase();
+                    return !Boolean.TRUE.equals(redisTemplate.hasKey(key));
+                });
+
+        if (!anyMissing) {
+            log.info("[랭킹 워밍업] 모든 등급 랭킹 캐시가 이미 존재합니다. 워밍업을 건너뜁니다.");
+            return;
+        }
+
+        log.info("[랭킹 워밍업] 랭킹 캐시 미존재 감지 — updateWeeklyBestProducts() 실행합니다.");
+        updateWeeklyBestProducts();
+        log.info("[랭킹 워밍업] 인기 상품 랭킹 캐시 워밍업 완료.");
+    }
+
     @Transactional(readOnly = true)
     public void updateWeeklyBestProducts() {
         log.info("[랭킹 스케줄러] 주간 베스트 무기 랭킹(등급별) 집계를 시작합니다.");

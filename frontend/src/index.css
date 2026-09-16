@@ -1,6 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&family=Share+Tech+Mono&display=swap');
 @import 'tailwindcss';
 
+@theme {
+  --color-chat-primary: #cc2200;
+  --color-chat-primary-hover: #e83010;
+  --color-chat-dark: #1a0000;
+  --color-chat-black: #060606;
+  --color-chat-border: rgba(204, 34, 0, 0.3);
+  --color-chat-border-light: rgba(204, 34, 0, 0.4);
+  --color-chat-muted: #a08070;
+  --color-chat-text-light: #f0e0d8;
+}
 html,
 body,
 #root {
