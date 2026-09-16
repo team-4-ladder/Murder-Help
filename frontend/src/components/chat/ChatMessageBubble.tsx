@@ -1,5 +1,6 @@
 import type { ChatMessageResponse, BotMessageDto } from "./chat.types";
 import { TIERS, gradeToTier } from "../../lib/tier";
+import { ORDER_STATUS_LABEL } from "../../lib/order";
 
 interface ChatMessageBubbleProps {
   message: ChatMessageResponse;
@@ -87,17 +88,18 @@ export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted
             </svg>
             <span className="text-xs text-emerald-400 font-semibold tracking-widest font-mono pt-[1px]">SYSTEM MENU</span>
           </div>
-          <div 
+          <div
             className={`text-[12.5px] tracking-tight text-zinc-300 leading-relaxed w-full px-2 mb-4 ${
-              botData.title?.includes('최근 주문 내역 안내') 
-                ? (isCompleted ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800/40 p-2 rounded-lg transition-colors border border-transparent hover:border-zinc-700/50') 
+              botData.title?.includes('최근 주문 내역 안내') && botData.orderId != null
+                ? (isCompleted ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800/40 p-2 rounded-lg transition-colors border border-transparent hover:border-zinc-700/50')
                 : ''
             }`}
             onClick={() => {
-              if (botData?.title?.includes('최근 주문 내역 안내')) {
+              if (botData?.title?.includes('최근 주문 내역 안내') && botData.orderId != null) {
                 if (isCompleted) return;
-                window.history.pushState({ view: { name: "mypage" } }, "");
-                window.dispatchEvent(new PopStateEvent("popstate", { state: { view: { name: "mypage" } } }));
+                const view = { name: "mypage", section: "orders", orderId: botData.orderId };
+                window.history.pushState({ view }, "");
+                window.dispatchEvent(new PopStateEvent("popstate", { state: { view } }));
               }
             }}
           >
@@ -108,9 +110,15 @@ export function ChatMessageBubble({ message: m, customerId, isAdmin, isCompleted
               </div>
             )}
             {/* 왼쪽 정렬될 본문 */}
-            {botData.text && (
+            {(botData.text || botData.orderStatus) && (
               <div className="text-left break-keep whitespace-pre-wrap">
                 {botData.text}
+                {botData.orderStatus && (
+                  <>
+                    {botData.text && "\n"}
+                    {`▪️ 주문 상태: ${ORDER_STATUS_LABEL[botData.orderStatus as keyof typeof ORDER_STATUS_LABEL] ?? botData.orderStatus}`}
+                  </>
+                )}
               </div>
             )}
           </div>

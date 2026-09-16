@@ -92,9 +92,17 @@ function DefaultProfileImage() {
     );
 }
 
-export function MyPage({ onBack }: { onBack: () => void }) {
-    /* 마이페이지 첫 진입 시 무조건 내 정보 수정 */
-    const [section, setSection] = useState<Section>("profile");
+export function MyPage({
+    onBack,
+    initialSection,
+    initialOrderId,
+}: {
+    onBack: () => void;
+    initialSection?: Section;
+    initialOrderId?: number;
+}) {
+    /* 마이페이지 첫 진입 시 기본은 내 정보 수정 — 챗봇 주문 링크 등으로 들어오면 지정된 섹션으로 시작 */
+    const [section, setSection] = useState<Section>(initialSection ?? "profile");
     const [tab, setTab] = useState<Tab>("pending");
     const [reviewView, setReviewView] = useState<"list" | "write" | "edit">("list");
     const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
@@ -765,6 +773,7 @@ function openReviewManagement() {
                                 onShop={onBack}
                                 onWriteReview={openReviewManagement}
                                 refreshKey={ordersRefreshKey}
+                                initialOrderId={initialOrderId}
                             />
                         </div>
                     )}

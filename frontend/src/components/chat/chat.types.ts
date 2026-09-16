@@ -60,6 +60,8 @@ export interface BotProductDto {
 export interface BotMessageDto {
   title?: string;
   text?: string;
+  orderId?: number;
+  orderStatus?: string;
   options?: BotOptionDto[];
   products?: BotProductDto[];
 }
