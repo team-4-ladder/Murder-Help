@@ -1144,7 +1144,7 @@ export default function App() {
                             LOAD FAILED
                           </div>
                           <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-                            // 상품을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+                            상품을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
                           </div>
                         </div>
                     ) : listItems.length > 0 ? (
