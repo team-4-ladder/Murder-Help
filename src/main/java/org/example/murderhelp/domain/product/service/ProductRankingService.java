@@ -136,7 +136,9 @@ public class ProductRankingService {
                     double reviewScore = (avgRating / 5.0) * confidence;
 
                     return salesScore * SALES_WEIGHT + reviewScore * REVIEW_WEIGHT;
-                }).reversed())
+                }).reversed()
+                        // 점수가 동률일 때 productId로 정렬
+                        .thenComparing(Candidate::productId))
                 .limit(TOP_N)
                 .map(c -> String.valueOf(c.productId()))
                 .toList();
