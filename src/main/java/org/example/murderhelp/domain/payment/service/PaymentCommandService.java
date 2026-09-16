@@ -2,6 +2,7 @@ package org.example.murderhelp.domain.payment.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.cart.service.CartService;
+import org.example.murderhelp.domain.member.service.MemberSpendingService;
 import org.example.murderhelp.domain.order.entity.Order;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
@@ -22,6 +23,7 @@ public class PaymentCommandService {
 
     private final PaymentService paymentService;
     private final CartService cartService;
+    private final MemberSpendingService memberSpendingService;
 
     /**
      * 결제 승인 + 주문 완료
@@ -45,6 +47,12 @@ public class PaymentCommandService {
 
         // Order 완료
         order.transitTo(OrderStatus.PAID);
+
+        // 누적 구매금액 및 회원 등급 반영
+        memberSpendingService.addPaymentAmount(
+                order.getMember().getId(),
+                payment.getAmount()
+        );
 
         // 장바구니 상품 삭제
         deleteCartItems(orderItems, order.getMember().getId());

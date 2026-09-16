@@ -2,6 +2,7 @@ package org.example.murderhelp.domain.payment.service;
 
 import org.example.murderhelp.domain.cart.service.CartService;
 import org.example.murderhelp.domain.member.entity.Member;
+import org.example.murderhelp.domain.member.service.MemberSpendingService;
 import org.example.murderhelp.domain.order.entity.Order;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
@@ -21,25 +22,31 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-/**
- * PaymentCommandService 는 "결제 상태 변경"과 "주문 상태 변경"을 하나의 트랜잭션으로 묶는
- * 곳이라, 여기서 재고 복구·장바구니 정리·상태 전이가 실제로 함께 일어나는지가 핵심이다.
- *
- * 특히 approvePaymentAndOrder() 는 과거 실제로 Order.transitTo(DELIVERED) 로 잘못
- * 전이시키던 버그가 있었던 지점이라, 정확히 PAID 로 전이하는지를 명시적으로 검증한다.
- */
 @ExtendWith(MockitoExtension.class)
 class PaymentCommandServiceTest {
+
+    private static final Long MEMBER_ID = 1L;
+    private static final Long ORDER_ID = 100L;
+    private static final Long PRODUCT_ID = 50L;
+    private static final Long PAYMENT_AMOUNT = 150_000L;
 
     @Mock
     private PaymentService paymentService;
 
     @Mock
     private CartService cartService;
+
+    @Mock
+    private MemberSpendingService memberSpendingService;
 
     @InjectMocks
     private PaymentCommandService paymentCommandService;
@@ -50,30 +57,53 @@ class PaymentCommandServiceTest {
     private Product product;
     private OrderItem orderItem;
 
-    private static final Long MEMBER_ID = 1L;
-    private static final Long ORDER_ID = 100L;
-    private static final Long PRODUCT_ID = 50L;
-
     @BeforeEach
     void setUp() {
         member = mock(Member.class);
-        lenient().when(member.getId()).thenReturn(MEMBER_ID);
+
+        lenient()
+                .when(member.getId())
+                .thenReturn(MEMBER_ID);
 
         order = mock(Order.class);
-        lenient().when(order.getId()).thenReturn(ORDER_ID);
-        lenient().when(order.getMember()).thenReturn(member);
-        lenient().when(order.getStatus())
-                .thenReturn(org.example.murderhelp.domain.order.entity.OrderStatus.PENDING_PAYMENT);   // 이 줄 추가
+
+        lenient()
+                .when(order.getId())
+                .thenReturn(ORDER_ID);
+
+        lenient()
+                .when(order.getMember())
+                .thenReturn(member);
+
+        lenient()
+                .when(order.getStatus())
+                .thenReturn(OrderStatus.PENDING_PAYMENT);
 
         product = mock(Product.class);
-        lenient().when(product.getId()).thenReturn(PRODUCT_ID);
+
+        lenient()
+                .when(product.getId())
+                .thenReturn(PRODUCT_ID);
 
         orderItem = mock(OrderItem.class);
-        lenient().when(orderItem.getProduct()).thenReturn(product);
-        lenient().when(orderItem.getQuantity()).thenReturn(2);
+
+        lenient()
+                .when(orderItem.getProduct())
+                .thenReturn(product);
+
+        lenient()
+                .when(orderItem.getQuantity())
+                .thenReturn(2);
 
         payment = mock(Payment.class);
-        lenient().when(payment.getOrder()).thenReturn(order);
+
+        lenient()
+                .when(payment.getOrder())
+                .thenReturn(order);
+
+        lenient()
+                .when(payment.getAmount())
+                .thenReturn(PAYMENT_AMOUNT);
     }
 
     @Nested
@@ -81,45 +111,146 @@ class PaymentCommandServiceTest {
     class ApprovePaymentAndOrder {
 
         @Test
-        @DisplayName("결제를 완료 처리하고 주문을 PAID 로 전이시킨다 (DELIVERED 아님)")
+        @DisplayName("결제를 완료 처리하고 주문을 PAID로 전이시킨다")
         void completesPaymentAndTransitsOrderToPaid() {
-            when(payment.getStatus()).thenReturn(PaymentStatus.PENDING);
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByOrderIdWithOrderForUpdate(ORDER_ID)).thenReturn(paymentWithItems);
+            // given
+            when(payment.getStatus())
+                    .thenReturn(PaymentStatus.PENDING);
 
-            paymentCommandService.approvePaymentAndOrder(ORDER_ID);
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            verify(paymentService).completePayment(payment);
-            verify(order).transitTo(OrderStatus.PAID);
-            verify(order, never()).transitTo(OrderStatus.DELIVERED);
+            when(
+                    paymentService.findByOrderIdWithOrderForUpdate(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
+
+            // when
+            paymentCommandService.approvePaymentAndOrder(
+                    ORDER_ID
+            );
+
+            // then
+            verify(paymentService)
+                    .completePayment(payment);
+
+            verify(order)
+                    .transitTo(OrderStatus.PAID);
+
+            verify(order, never())
+                    .transitTo(OrderStatus.DELIVERED);
         }
 
         @Test
         @DisplayName("결제 완료 후 주문 상품을 productId 기준으로 장바구니에서 정리한다")
         void deletesCartItemsByProductIdAfterApproval() {
-            when(payment.getStatus()).thenReturn(PaymentStatus.PENDING);
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByOrderIdWithOrderForUpdate(ORDER_ID)).thenReturn(paymentWithItems);
+            // given
+            when(payment.getStatus())
+                    .thenReturn(PaymentStatus.PENDING);
 
-            paymentCommandService.approvePaymentAndOrder(ORDER_ID);
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            // cartItemId 가 아니라 productId 기준 정리 메서드가 호출되어야 한다
-            verify(cartService).deleteItemsByProductIds(MEMBER_ID, List.of(PRODUCT_ID));
+            when(
+                    paymentService.findByOrderIdWithOrderForUpdate(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
+
+            // when
+            paymentCommandService.approvePaymentAndOrder(
+                    ORDER_ID
+            );
+
+            // then
+            verify(cartService)
+                    .deleteItemsByProductIds(
+                            MEMBER_ID,
+                            List.of(PRODUCT_ID)
+                    );
+        }
+
+        @Test
+        @DisplayName("결제 완료 후 결제금액을 회원 누적 구매금액에 반영한다")
+        void addsPaymentAmountToMemberSpending() {
+            // given
+            when(payment.getStatus())
+                    .thenReturn(PaymentStatus.PENDING);
+
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
+
+            when(
+                    paymentService.findByOrderIdWithOrderForUpdate(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
+
+            // when
+            paymentCommandService.approvePaymentAndOrder(
+                    ORDER_ID
+            );
+
+            // then
+            verify(memberSpendingService)
+                    .addPaymentAmount(
+                            MEMBER_ID,
+                            PAYMENT_AMOUNT
+                    );
         }
 
         @Test
         @DisplayName("이미 COMPLETED 상태면 중복 처리하지 않고 즉시 응답만 반환한다")
         void isIdempotentWhenAlreadyCompleted() {
-            when(payment.getStatus()).thenReturn(PaymentStatus.COMPLETED);
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByOrderIdWithOrderForUpdate(ORDER_ID)).thenReturn(paymentWithItems);
+            // given
+            when(payment.getStatus())
+                    .thenReturn(PaymentStatus.COMPLETED);
 
-            paymentCommandService.approvePaymentAndOrder(ORDER_ID);
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            // Confirm API와 웹훅이 동시에 들어와도 두 번째 요청은 아무 것도 바꾸면 안 된다
-            verify(paymentService, never()).completePayment(any());
-            verify(order, never()).transitTo(any());
-            verify(cartService, never()).deleteItemsByProductIds(anyLong(), anyList());
+            when(
+                    paymentService.findByOrderIdWithOrderForUpdate(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
+
+            // when
+            paymentCommandService.approvePaymentAndOrder(
+                    ORDER_ID
+            );
+
+            // then
+            verify(paymentService, never())
+                    .completePayment(any());
+
+            verify(order, never())
+                    .transitTo(any());
+
+            verify(cartService, never())
+                    .deleteItemsByProductIds(
+                            anyLong(),
+                            anyList()
+                    );
+
+            verify(memberSpendingService, never())
+                    .addPaymentAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
     }
 
@@ -130,14 +261,43 @@ class PaymentCommandServiceTest {
         @Test
         @DisplayName("결제를 실패 처리하고 주문을 취소하며 재고를 복구한다")
         void failsPaymentCancelsOrderAndRestoresStock() {
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByOrderIdWithOrder(ORDER_ID)).thenReturn(paymentWithItems);
+            // given
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            paymentCommandService.failPaymentAndOrder(ORDER_ID, FailReason.PG_DECLINED);
+            when(
+                    paymentService.findByOrderIdWithOrder(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
 
-            verify(paymentService).failPayment(payment, FailReason.PG_DECLINED);
-            verify(order).transitTo(OrderStatus.CANCELED);
-            verify(product).restoreStock(2);
+            // when
+            paymentCommandService.failPaymentAndOrder(
+                    ORDER_ID,
+                    FailReason.PG_DECLINED
+            );
+
+            // then
+            verify(paymentService)
+                    .failPayment(
+                            payment,
+                            FailReason.PG_DECLINED
+                    );
+
+            verify(order)
+                    .transitTo(OrderStatus.CANCELED);
+
+            verify(product)
+                    .restoreStock(2);
+
+            verify(memberSpendingService, never())
+                    .addPaymentAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
     }
 
@@ -148,14 +308,39 @@ class PaymentCommandServiceTest {
         @Test
         @DisplayName("결제를 취소 처리하고 주문을 취소하며 재고를 복구한다")
         void cancelsPaymentCancelsOrderAndRestoresStock() {
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByOrderIdWithOrder(ORDER_ID)).thenReturn(paymentWithItems);
+            // given
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            paymentCommandService.cancelPaymentAndOrder(ORDER_ID);
+            when(
+                    paymentService.findByOrderIdWithOrder(
+                            ORDER_ID
+                    )
+            ).thenReturn(paymentWithItems);
 
-            verify(paymentService).cancelPayment(payment);
-            verify(order).transitTo(OrderStatus.CANCELED);
-            verify(product).restoreStock(2);
+            // when
+            paymentCommandService.cancelPaymentAndOrder(
+                    ORDER_ID
+            );
+
+            // then
+            verify(paymentService)
+                    .cancelPayment(payment);
+
+            verify(order)
+                    .transitTo(OrderStatus.CANCELED);
+
+            verify(product)
+                    .restoreStock(2);
+
+            verify(memberSpendingService, never())
+                    .addPaymentAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
     }
 }
