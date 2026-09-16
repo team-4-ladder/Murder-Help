@@ -13,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +25,11 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewControllerTest {
+
+    private static final Long MEMBER_ID = 1L;
+    private static final Long REVIEW_ID = 100L;
+    private static final Long ORDER_ITEM_ID = 10L;
+    private static final Long PRODUCT_ID = 1L;
 
     @InjectMocks
     private ReviewController reviewController;
@@ -35,33 +42,52 @@ class ReviewControllerTest {
     void getPendingReviews() {
         // given
         LocalDateTime purchasedAt =
-                LocalDateTime.of(2026, 9, 15, 15, 30);
+                LocalDateTime.of(
+                        2026,
+                        9,
+                        15,
+                        15,
+                        30
+                );
 
         PendingReviewResponse pendingReview =
                 new PendingReviewResponse(
-                        10L,
+                        ORDER_ITEM_ID,
                         "P001",
                         "리뷰 테스트 상품",
                         purchasedAt,
                         "https://example.com/product.png"
                 );
 
-        when(reviewService.getPendingReviews(1L))
-                .thenReturn(List.of(pendingReview));
+        when(reviewService.getPendingReviews(MEMBER_ID))
+                .thenReturn(
+                        List.of(pendingReview)
+                );
 
         // when
-        ApiResponse<List<PendingReviewResponse>> result =
-                reviewController.getPendingReviews(1L);
+        ResponseEntity<ApiResponse<List<PendingReviewResponse>>> result =
+                reviewController.getPendingReviews(
+                        MEMBER_ID
+                );
 
         // then
-        assertThat(result.getCode())
+        assertThat(result.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(result.getBody())
+                .isNotNull();
+
+        ApiResponse<List<PendingReviewResponse>> body =
+                result.getBody();
+
+        assertThat(body.getCode())
                 .isEqualTo("SUCCESS");
 
-        assertThat(result.getData())
+        assertThat(body.getData())
                 .containsExactly(pendingReview);
 
         verify(reviewService)
-                .getPendingReviews(1L);
+                .getPendingReviews(MEMBER_ID);
     }
 
     @Test
@@ -70,37 +96,50 @@ class ReviewControllerTest {
         // given
         MyReviewResponse review =
                 myReviewResponse(
-                        100L,
-                        10L,
-                        1L,
+                        REVIEW_ID,
+                        ORDER_ITEM_ID,
+                        PRODUCT_ID,
                         "P001",
                         "리뷰 테스트 상품",
                         5,
                         "좋은 상품입니다."
                 );
 
-        when(reviewService.getMyReviews(1L))
-                .thenReturn(List.of(review));
+        when(reviewService.getMyReviews(MEMBER_ID))
+                .thenReturn(
+                        List.of(review)
+                );
 
         // when
-        ApiResponse<List<MyReviewResponse>> result =
-                reviewController.getMyReviews(1L);
+        ResponseEntity<ApiResponse<List<MyReviewResponse>>> result =
+                reviewController.getMyReviews(
+                        MEMBER_ID
+                );
 
         // then
-        assertThat(result.getCode())
+        assertThat(result.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(result.getBody())
+                .isNotNull();
+
+        ApiResponse<List<MyReviewResponse>> body =
+                result.getBody();
+
+        assertThat(body.getCode())
                 .isEqualTo("SUCCESS");
 
-        assertThat(result.getData())
+        assertThat(body.getData())
                 .containsExactly(review);
 
-        assertThat(result.getData().get(0).productCode())
+        assertThat(body.getData().get(0).productCode())
                 .isEqualTo("P001");
 
-        assertThat(result.getData().get(0).productName())
+        assertThat(body.getData().get(0).productName())
                 .isEqualTo("리뷰 테스트 상품");
 
         verify(reviewService)
-                .getMyReviews(1L);
+                .getMyReviews(MEMBER_ID);
     }
 
     @Test
@@ -109,36 +148,55 @@ class ReviewControllerTest {
         // given
         ReviewCreateRequest request =
                 new ReviewCreateRequest(
-                        10L,
+                        ORDER_ITEM_ID,
                         5,
                         "리뷰 작성 테스트"
                 );
 
         ReviewResponse response =
                 reviewResponse(
-                        100L,
-                        10L,
-                        1L,
+                        REVIEW_ID,
+                        ORDER_ITEM_ID,
+                        PRODUCT_ID,
                         5,
                         "리뷰 작성 테스트"
                 );
 
-        when(reviewService.createReview(1L, request))
-                .thenReturn(response);
+        when(
+                reviewService.createReview(
+                        MEMBER_ID,
+                        request
+                )
+        ).thenReturn(response);
 
         // when
-        ApiResponse<ReviewResponse> result =
-                reviewController.createReview(1L, request);
+        ResponseEntity<ApiResponse<ReviewResponse>> result =
+                reviewController.createReview(
+                        MEMBER_ID,
+                        request
+                );
 
         // then
-        assertThat(result.getCode())
+        assertThat(result.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(result.getBody())
+                .isNotNull();
+
+        ApiResponse<ReviewResponse> body =
+                result.getBody();
+
+        assertThat(body.getCode())
                 .isEqualTo("SUCCESS");
 
-        assertThat(result.getData())
+        assertThat(body.getData())
                 .isEqualTo(response);
 
         verify(reviewService)
-                .createReview(1L, request);
+                .createReview(
+                        MEMBER_ID,
+                        request
+                );
     }
 
     @Test
@@ -153,48 +211,84 @@ class ReviewControllerTest {
 
         ReviewResponse response =
                 reviewResponse(
-                        100L,
-                        10L,
-                        1L,
+                        REVIEW_ID,
+                        ORDER_ITEM_ID,
+                        PRODUCT_ID,
                         4,
                         "수정된 리뷰입니다."
                 );
 
-        when(reviewService.updateReview(1L, 100L, request))
-                .thenReturn(response);
+        when(
+                reviewService.updateReview(
+                        MEMBER_ID,
+                        REVIEW_ID,
+                        request
+                )
+        ).thenReturn(response);
 
         // when
-        ApiResponse<ReviewResponse> result =
+        ResponseEntity<ApiResponse<ReviewResponse>> result =
                 reviewController.updateReview(
-                        1L,
-                        100L,
+                        MEMBER_ID,
+                        REVIEW_ID,
                         request
                 );
 
         // then
-        assertThat(result.getCode())
+        assertThat(result.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(result.getBody())
+                .isNotNull();
+
+        ApiResponse<ReviewResponse> body =
+                result.getBody();
+
+        assertThat(body.getCode())
                 .isEqualTo("SUCCESS");
 
-        assertThat(result.getData())
+        assertThat(body.getData())
                 .isEqualTo(response);
 
         verify(reviewService)
-                .updateReview(1L, 100L, request);
+                .updateReview(
+                        MEMBER_ID,
+                        REVIEW_ID,
+                        request
+                );
     }
 
     @Test
     @DisplayName("리뷰 삭제 요청을 서비스에 전달한다")
     void deleteReview() {
         // when
-        ApiResponse<Void> result =
-                reviewController.deleteReview(1L, 100L);
+        ResponseEntity<ApiResponse<Void>> result =
+                reviewController.deleteReview(
+                        MEMBER_ID,
+                        REVIEW_ID
+                );
 
         // then
-        assertThat(result.getCode())
+        assertThat(result.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(result.getBody())
+                .isNotNull();
+
+        ApiResponse<Void> body =
+                result.getBody();
+
+        assertThat(body.getCode())
                 .isEqualTo("SUCCESS");
 
+        assertThat(body.getData())
+                .isNull();
+
         verify(reviewService)
-                .deleteReview(1L, 100L);
+                .deleteReview(
+                        MEMBER_ID,
+                        REVIEW_ID
+                );
     }
 
     private MyReviewResponse myReviewResponse(
@@ -206,7 +300,8 @@ class ReviewControllerTest {
             Integer rating,
             String content
     ) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         return new MyReviewResponse(
                 reviewId,
@@ -228,7 +323,8 @@ class ReviewControllerTest {
             Integer rating,
             String content
     ) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now =
+                LocalDateTime.now();
 
         return new ReviewResponse(
                 reviewId,
