@@ -169,7 +169,8 @@ sequenceDiagram
 > 담당자별 트러블슈팅/기술 의사결정 기록.
 
 <details>
-<summary><b>정민</b> — 작성 예정</summary>
+<summary><b>정민</b> — 결제 확정 로직에서 동시성 문제를 인식하고 해결하기</summary>
+    - [결제 확정 로직에서 동시성 문제를 인식하고 해결하기](https://record47584.tistory.com/125)
 </details>
 
 <details>
