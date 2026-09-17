@@ -9,7 +9,6 @@ import org.example.murderhelp.domain.payment.entity.Payment;
 import org.example.murderhelp.domain.payment.repository.dto.PaymentWithItems;
 import org.example.murderhelp.domain.payment.service.PaymentService;
 import org.example.murderhelp.domain.product.repository.ProductRepository;
-import org.example.murderhelp.domain.product.service.ProductService;
 import org.example.murderhelp.domain.refund.component.RefundCalculator;
 import org.example.murderhelp.domain.refund.dto.RefundHistoryResponse;
 import org.example.murderhelp.domain.refund.dto.RefundRequest;
@@ -78,7 +77,7 @@ public class RefundService {
         Map<Long, Integer> refundedMap = refundItemRepository.findRefundedQuantitiesByOrderItemIds(itemIds).stream()
                 .collect(toMap(
                         RefundedQuantity::orderItemId,
-                        rq -> rq.refundedQuantity().intValue()
+                        RefundedQuantity::refundedQuantity
                 ));
 
         return orderItems.stream().collect(toMap(
