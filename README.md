@@ -720,39 +720,77 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor C as 고객 (App)
-    participant S as 서버 / DB
+    participant S as 서버
+    participant DB as DB
 
     %% 1단계: 회원가입
     rect rgb(240, 245, 255)
-    Note over C, S: [1단계] 회원가입 (CODE YELLOW 등급으로 시작)
-    C->>S: POST /api/auth/signup (email, password, name, phone)
-    S->>S: 이메일 중복 검증
-    alt 이메일 중복
-    S-->>C: 409 Conflict ("이미 사용 중인 이메일입니다")
-    else 검증 통과
-    S->>S: 비밀번호 암호화 저장, CODE YELLOW 등급 부여
-    S-->>C: 201 Created (자동 로그인 처리, 세션 발급)
-    end
+        Note over C, DB: [1단계] 회원가입 (CODE YELLOW 등급으로 시작)
+
+        C->>S: POST /api/auth/signup (email, password, name, phone)
+        S->>DB: 이메일 중복 확인
+
+        alt 이메일 중복
+            DB-->>S: 중복 이메일 존재
+            S-->>C: 409 Conflict (이미 존재하는 이메일입니다)
+        else 사용 가능한 이메일
+            DB-->>S: 중복 이메일 없음
+            S->>S: 비밀번호 BCrypt 암호화
+            S->>DB: 회원 저장 (grade = YELLOW)
+            S->>DB: 회원 누적 구매정보 생성 (netSpentAmount = 0)
+            S-->>C: 200 OK (회원가입 완료)
+        end
     end
 
     %% 2단계: 로그인
     rect rgb(245, 255, 245)
-    Note over C, S: [2단계] 로그인
-    C->>S: POST /api/auth/login (email, password)
-    S->>S: 저장된 비밀번호와 비교 검증
-    alt 인증 성공
-    S-->>C: 200 OK (세션/토큰 발급, 로그인 상태 유지)
-    else 인증 실패
-    S-->>C: 401 Unauthorized ("아이디 또는 비밀번호가 일치하지 않습니다")
-    end
+        Note over C, DB: [2단계] 로그인
+
+        C->>S: POST /api/auth/login (email, password)
+        S->>DB: 이메일로 회원 조회
+        DB-->>S: 회원 정보 반환
+        S->>S: BCrypt로 비밀번호 비교
+
+        alt 인증 성공
+            S->>S: Access Token 및 Refresh Token 생성
+            S->>DB: Refresh Token 저장 또는 갱신
+            S-->>C: 200 OK (Access Token 응답, Refresh Token은 HttpOnly 쿠키로 발급)
+            C->>C: Access Token을 메모리에 저장
+        else 인증 실패
+            S-->>C: 401 Unauthorized (이메일 또는 비밀번호가 올바르지 않습니다)
+        end
     end
 
-    %% 3단계: 로그아웃
+    %% 3단계: Access Token 재발급
+    rect rgb(255, 250, 235)
+        Note over C, DB: [3단계] Access Token 재발급
+
+        C->>S: POST /api/auth/reissue (Refresh Token 쿠키 자동 전송)
+        S->>S: Refresh Token 서명, 만료시간 및 타입 검증
+        S->>DB: 회원 ID로 저장된 Refresh Token 조회
+        DB-->>S: 저장된 Refresh Token 반환
+        S->>S: 전달된 토큰과 저장된 토큰 비교
+
+        alt Refresh Token 유효
+            S->>S: 새로운 Access Token 및 Refresh Token 생성
+            S->>DB: 저장된 Refresh Token 갱신
+            S-->>C: 200 OK (새 Access Token 응답, 새 Refresh Token 쿠키 발급)
+            C->>C: 새 Access Token을 메모리에 저장
+        else Refresh Token 무효 또는 만료
+            S-->>C: 401 Unauthorized (유효하지 않은 리프레시 토큰입니다)
+            C->>C: 로그인 만료 처리
+        end
+    end
+
+    %% 4단계: 로그아웃
     rect rgb(255, 245, 245)
-    Note over C, S: [3단계] 로그아웃
-    C->>S: POST /api/auth/logout
-    S->>S: 세션/토큰 무효화
-    S-->>C: 200 OK (로그인 화면으로 이동)
+        Note over C, DB: [4단계] 로그아웃
+
+        C->>S: POST /api/auth/logout (Authorization: Bearer Access Token)
+        S->>DB: 회원의 Refresh Token 삭제
+        S-->>C: 200 OK (Refresh Token 쿠키 만료)
+        C->>C: 메모리의 Access Token 제거
+        C->>C: 로그인 화면으로 이동
     end
 ```
 
@@ -771,32 +809,60 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor C as 고객 (App)
-    participant S as 서버 / DB
+    participant S as 서버
+    participant DB as DB
 
-    %% 1단계: 리뷰 작성
+    %% 1단계: 리뷰 작성 가능 상품 조회
     rect rgb(240, 245, 255)
-    Note over C, S: [1단계] 리뷰 작성 (구매 확정 상품 대상)
-    C->>S: GET /api/order-items/{orderItemId}/review (기존 리뷰 여부 확인)
-    S-->>C: 리뷰 없음 (작성 가능)
-    Note over C: 별점 선택 + 내용 입력 후 등록 버튼 클릭
-    C->>S: POST /api/reviews (order_item_id, product_id, rating, content)
-    S->>S: UNIQUE(order_item_id) 검증 후 리뷰 저장
-    S-->>C: 201 Created (등록된 리뷰 반환)
+        Note over C, DB: [1단계] 리뷰 작성 가능 상품 조회
+
+        C->>S: GET /api/reviews/pending
+        S->>DB: 로그인 회원의 배송 완료 주문상품 조회
+        DB-->>S: 배송 완료 및 리뷰 미작성 상품 목록
+        S-->>C: 200 OK (리뷰 작성 가능 상품 목록 반환)
+
+        Note over C: 상품 선택 후 별점과 리뷰 내용 입력
+        C->>S: POST /api/reviews (orderItemId, rating, content)
+
+        S->>DB: 주문상품 조회
+        S->>S: 회원 소유 여부 확인
+        S->>S: 주문 상태가 DELIVERED인지 확인
+        S->>DB: 해당 주문상품의 기존 리뷰 여부 확인
+
+        alt 리뷰 작성 가능
+            S->>DB: 리뷰 저장 (productId는 주문상품에서 조회)
+            DB-->>S: 저장된 리뷰
+            S-->>C: 200 OK (등록된 리뷰 반환)
+        else 다른 회원의 주문상품
+            S-->>C: 403 Forbidden (권한이 없습니다)
+        else 배송 완료 이전 주문상품
+            S-->>C: 400 Bad Request (배송 완료된 상품만 리뷰를 작성할 수 있습니다)
+        else 기존 리뷰 존재
+            S-->>C: 400 Bad Request (이미 작성한 리뷰가 있습니다)
+        end
     end
 
-    %% 2단계: 리뷰 목록 조회
+    %% 2단계: 상품 리뷰 목록 조회
     rect rgb(245, 255, 245)
-    Note over C, S: [2단계] 리뷰 목록 조회 (상품 상세 페이지)
-    C->>S: GET /api/products/{productId}/reviews
-    S-->>C: 리뷰 목록 + 평균 평점 + 별점 분포 반환
-    Note over C: 리스트 렌더링 (최신순), 새로고침 없이 등록 반영
+        Note over C, DB: [2단계] 상품 상세 리뷰 조회
+
+        C->>S: GET /api/products/{productId}/reviews
+        S->>DB: 상품 ID에 해당하는 리뷰를 최신순으로 조회
+        DB-->>S: 리뷰 목록
+        S-->>C: 200 OK (최신순 리뷰 목록 반환)
+
+        C->>C: 평균 평점과 별점 분포 계산
+        C->>C: 리뷰 목록 및 통계 렌더링
     end
 
-    %% 3단계: 예외 - 중복 작성
+    %% 3단계: 중복 리뷰 작성 예외
     rect rgb(255, 245, 245)
-    Note over C, S: [예외] 이미 리뷰가 존재하는 주문상품
-    C->>S: POST /api/reviews (동일 order_item_id)
-    S-->>C: 409 Conflict ("이미 작성한 리뷰가 있습니다")
+        Note over C, DB: [예외] 이미 리뷰가 작성된 주문상품
+
+        C->>S: POST /api/reviews (동일한 orderItemId, rating, content)
+        S->>DB: 기존 리뷰 존재 여부 확인
+        DB-->>S: 기존 리뷰 존재
+        S-->>C: 400 Bad Request (이미 작성한 리뷰가 있습니다)
     end
 ```
 
