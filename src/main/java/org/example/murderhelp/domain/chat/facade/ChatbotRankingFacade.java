@@ -1,15 +1,15 @@
-package org.example.murderhelp.domain.product.service;
+package org.example.murderhelp.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.murderhelp.domain.chat.redis.ChatbotRankingCache;
+import org.example.murderhelp.domain.order.dto.ProductSalesCount;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
-import org.example.murderhelp.domain.order.repository.OrderItemRepository;
+import org.example.murderhelp.domain.order.service.OrderItemQueryService;
 import org.example.murderhelp.domain.product.entity.ProductTier;
 import org.example.murderhelp.domain.review.dto.ReviewStats;
-import org.example.murderhelp.domain.review.repository.ReviewRepository;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
+import org.example.murderhelp.domain.review.service.ReviewQueryService;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -19,17 +19,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 챗봇 "무기 추천" 기능에 쓰이는 등급별 주간 베스트 상품 랭킹을 집계해 Redis 캐시에 반영하는 파사드.
+ * Order(판매량)와 Review(평점/리뷰 수) 도메인을 동시에 조합해야 하는 로직이라 특정 도메인 서비스에
+ * 두지 않고 이 파사드가 두 도메인의 조회 서비스를 조율한다.
+ */
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
-public class ProductRankingService {
+public class ChatbotRankingFacade {
 
-    private final OrderItemRepository orderItemRepository;
-    private final ReviewRepository reviewRepository;
-    private final StringRedisTemplate redisTemplate;
-
-    public static final String RANKING_TARGET_KEY_PREFIX = "ranking:weekly:best:";
-    private static final String RANKING_TEMP_KEY_PREFIX = "ranking:weekly:best:temp:";
+    private final OrderItemQueryService orderItemQueryService;
+    private final ReviewQueryService reviewQueryService;
+    private final ChatbotRankingCache chatbotRankingCache;
 
     // 판매량만으로는 상위권에 못 들었지만 리뷰가 좋은 상품도 재정렬 대상에 들도록 넉넉히 뽑아두는 후보군 크기
     private static final int CANDIDATE_POOL_SIZE = 20;
@@ -41,7 +43,7 @@ public class ProductRankingService {
     private static final int REVIEW_CONFIDENCE_THRESHOLD = 5;
 
     /**
-     * 기동 시 조건부 워밍업 — RankingWarmupListener에 의해 호출됨 (test 프로파일 제외)
+     * 기동 시 조건부 워밍업 — ChatbotRankingWarmupListener에 의해 호출됨 (test 프로파일 제외)
      * 등급별 Redis 키가 하나라도 없을 때만 updateWeeklyBestProducts() 실행
      */
     public void warmUpOnStartup() {
@@ -49,10 +51,7 @@ public class ProductRankingService {
 
         boolean anyMissing = Arrays.stream(ProductTier.values())
                 .filter(tier -> tier != ProductTier.GREEN)
-                .anyMatch(tier -> {
-                    String key = RANKING_TARGET_KEY_PREFIX + tier.name().toLowerCase();
-                    return !Boolean.TRUE.equals(redisTemplate.hasKey(key));
-                });
+                .anyMatch(tier -> !chatbotRankingCache.exists(tier));
 
         if (!anyMissing) {
             log.info("[랭킹 워밍업] 모든 등급 랭킹 캐시가 이미 존재합니다. 워밍업을 건너뜁니다.");
@@ -79,28 +78,19 @@ public class ProductRankingService {
                     .filter(userTier::canAccess)
                     .collect(Collectors.toList());
 
-            List<Object[]> topSelling = orderItemRepository.findTopSellingProductsByTiersSince(
-                    startDate,
-                    OrderStatus.DELIVERED,
-                    allowedTiers,
-                    PageRequest.of(0, CANDIDATE_POOL_SIZE)
+            List<ProductSalesCount> topSelling = orderItemQueryService.findTopSellingProducts(
+                    startDate, OrderStatus.DELIVERED, allowedTiers, CANDIDATE_POOL_SIZE
             );
-
-            String targetKey = RANKING_TARGET_KEY_PREFIX + userTier.name().toLowerCase();
-            String tempKey = RANKING_TEMP_KEY_PREFIX + userTier.name().toLowerCase();
 
             if (topSelling.isEmpty()) {
                 log.info("[랭킹 스케줄러] 최근 7일간 판매된 데이터가 없어 {} 등급 기존 랭킹 캐시를 초기화합니다.", userTier.name());
-                redisTemplate.delete(targetKey);
+                chatbotRankingCache.evict(userTier);
                 continue;
             }
 
             List<String> productIds = rankByScore(topSelling);
+            chatbotRankingCache.replaceAtomically(userTier, productIds);
 
-            redisTemplate.delete(tempKey);
-            redisTemplate.opsForList().rightPushAll(tempKey, productIds);
-            redisTemplate.rename(tempKey, targetKey);
-            
             log.info("[랭킹 스케줄러] {} 등급 주간 베스트 무기 랭킹 갱신 완료! (상품 ID: {})", userTier.name(), productIds);
         }
     }
@@ -109,24 +99,16 @@ public class ProductRankingService {
      * 판매량 후보군(candidatePool)을 판매 점수 + 리뷰 점수 가중합으로 재정렬해 상위 TOP_N개의 상품 ID를 반환한다.
      * 판매 점수는 후보군 내 min-max 정규화, 리뷰 점수는 평균 평점을 리뷰 수 기반 신뢰도로 감쇠해 산출한다.
      */
-    private List<String> rankByScore(List<Object[]> candidatePool) {
-        record Candidate(Long productId, long salesQty) {}
+    private List<String> rankByScore(List<ProductSalesCount> candidatePool) {
+        List<Long> candidateIds = candidatePool.stream().map(ProductSalesCount::productId).toList();
+        Map<Long, ReviewStats> reviewStatsByProductId = reviewQueryService.getReviewStats(candidateIds);
 
-        List<Candidate> candidates = candidatePool.stream()
-                .map(row -> new Candidate((Long) row[0], ((Number) row[1]).longValue()))
-                .toList();
-
-        List<Long> candidateIds = candidates.stream().map(Candidate::productId).toList();
-        Map<Long, ReviewStats> reviewStatsByProductId = reviewRepository.findReviewStatsByProductIds(candidateIds)
-                .stream()
-                .collect(Collectors.toMap(ReviewStats::productId, stats -> stats));
-
-        long maxSales = candidates.stream().mapToLong(Candidate::salesQty).max().orElse(1);
-        long minSales = candidates.stream().mapToLong(Candidate::salesQty).min().orElse(0);
+        long maxSales = candidatePool.stream().mapToLong(ProductSalesCount::salesQty).max().orElse(1);
+        long minSales = candidatePool.stream().mapToLong(ProductSalesCount::salesQty).min().orElse(0);
         long salesRange = Math.max(1, maxSales - minSales);
 
-        return candidates.stream()
-                .sorted(Comparator.comparingDouble((Candidate c) -> {
+        return candidatePool.stream()
+                .sorted(Comparator.comparingDouble((ProductSalesCount c) -> {
                     double salesScore = (double) (c.salesQty() - minSales) / salesRange;
 
                     ReviewStats stats = reviewStatsByProductId.get(c.productId());
@@ -138,7 +120,7 @@ public class ProductRankingService {
                     return salesScore * SALES_WEIGHT + reviewScore * REVIEW_WEIGHT;
                 }).reversed()
                         // 점수가 동률일 때 productId로 정렬
-                        .thenComparing(Candidate::productId))
+                        .thenComparing(ProductSalesCount::productId))
                 .limit(TOP_N)
                 .map(c -> String.valueOf(c.productId()))
                 .toList();
