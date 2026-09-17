@@ -1,6 +1,7 @@
 # 🔪 Murder-Help
 
-> 회원 등급에 따라 접근 가능한 상품 등급이 달라지는 등급제 커머스 플랫폼. Redis 캐시로 검색 성능을 확보하고, STOMP 기반 실시간 문의 채팅 + 규칙 기반 챗봇을 제공합니다..
+> 회원 등급에 따라 접근 가능한 상품 등급이 달라지는 등급제 커머스 플랫폼입니다.<br>
+> Redis 캐시로 검색 성능을 확보하고, STOMP 기반 실시간 문의 채팅 + 규칙 기반 챗봇을 제공합니다.
 
 | 설명                 | 링크                                                           |
 |--------------------|--------------------------------------------------------------|
@@ -10,20 +11,20 @@
 
 ---
 
-## 🛠️ 기술 스택
+### 🛠️ 기술 스택
 
 | 구분 | 스택 |
 |---|---|
 | **Backend** | Java 17 · Spring Boot 4.1 · Spring Security · Spring Data JPA + QueryDSL · Spring WebSocket(STOMP) |
-| **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS 4 · `@stomp/stompjs` + `sockjs-client`(실시간 채팅) · `@portone/browser-sdk`(결제) |
+| **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS 4 · `@stomp/stompjs` + `sockjs-client`· `@portone/browser-sdk` |
 | **Database & Cache** | MySQL 8.0 · Redis 7 (Cache-aside, Pub/Sub, ShedLock 분산 락) · Caffeine(로컬/테스트 대체) |
 | **Infra & CI** | Docker 멀티스테이지 빌드 · GitHub Actions(CI/CD) · AWS(EC2 arm64, ECR, RDS, ElastiCache, S3, Parameter Store, SSM) · GHCR |
 
 ---
 
-## 📦 패키지 구조
+### 📦 패키지 구조
 
-### Backend
+**Backend**
 ```
 org.example.murderhelp
 ├── domain
@@ -57,7 +58,7 @@ org.example.murderhelp
 ```
 
 
-### Frontend
+**Frontend**
 ```
 frontend/src
 ├── api          # 백엔드 호출 모듈 (auth, cart, member, orders, payment, ...)
@@ -156,10 +157,10 @@ sequenceDiagram
 
 ## ✨ 핵심 기능
 
-- **등급제 접근 제어** — `Grade`(회원)·`ProductTier`(상품)가 같은 색 체계를 공유, `canAccess()`로 자기 등급 이하 상품만 조회/구매 가능
-- **Redis 캐시 3종** — 상품 검색 Cache-aside(v1/v2 비교), 챗봇 주간 베스트 랭킹(원자적 `RENAME` 교체), 채팅 마지막 메시지 캐시
-- **실시간 상담 + 규칙 기반 챗봇** — STOMP+Redis Pub/Sub 멀티 인스턴스 브로드캐스트, `BotCommandDispatcher`가 무기 추천/주문 조회/상담사 연결 라우팅
-- **결제·환불 신뢰성** — PortOne 결제를 서버에서 금액·상태 재검증, Webhook 서명 검증, 주문 항목 단위 부분 환불
+- **등급제 접근 제어** : `Grade`(회원)·`ProductTier`(상품)가 같은 색 체계를 공유, `canAccess()`로 자기 등급 이하 상품만 조회/구매 가능
+- **Redis 캐시 3종** : 상품 검색 Cache-aside(v1/v2 비교), 챗봇 주간 베스트 랭킹, 채팅 마지막 메시지 캐시
+- **실시간 상담+규칙기반 챗봇** : Redis Pub/Sub 멀티 인스턴스 브로드캐스트, `BotCommandDispatcher`가 무기 추천/주문 조회/상담사 연결 라우팅
+- **결제·환불 신뢰성** : PortOne 결제를 서버에서 금액·상태 재검증, Webhook 서명 검증, 주문 항목 단위 부분 환불
 
 ---
 
