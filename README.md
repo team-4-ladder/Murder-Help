@@ -166,8 +166,44 @@ sequenceDiagram
 
 ## 📝 기술적 의사결정 및 트러블슈팅
 
-> 각 항목은 추후 상세 포스트로 확장 예정. 
+> 담당자별 트러블슈팅/기술 의사결정 기록.
 
+<details>
+<summary><b>정민</b> — 작성 예정</summary>
+</details>
+
+<details>
+<summary><b>용범</b> — BBUMM 결제·환불 동시 처리에 따른 회원 등급 데이터 정합성 문제 해결</summary>
+
+- [결제·환불 동시 처리에 따른 회원 등급 데이터 정합성 문제 해결](https://atom700.tistory.com/entry/%EA%B2%B0%EC%A0%9C%C2%B7%ED%99%98%EB%B6%88-%EB%8F%99%EC%8B%9C-%EC%B2%98%EB%A6%AC%EC%97%90-%EB%94%B0%EB%A5%B8-%ED%9A%8C%EC%9B%90-%EB%93%B1%EA%B8%89-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%A0%95%ED%95%A9%EC%84%B1-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+
+</details>
+
+<details>
+<summary><b>준모</b> — CI/CD 파이프라인 트러블슈팅 (ARM64 빌드, 타임존)</summary>
+
+- **문제**: 배포 대상 EC2가 `t4g`(arm64)인데 이미지는 `ubuntu-latest`(x86) 러너에서 빌드되고 있었음
+- **해결**: `runs-on: ubuntu-24.04-arm`으로 바꿔 arm 러너에서 바로 빌드하고 QEMU 단계 제거. Dockerfile 빌더 단계에 `--platform=$BUILDPLATFORM`, 빌드에는 GHA 캐시 적용 (`cd.yml`, #11)
+  <br><br>
+- **문제**: 타임존이 맞지 않음
+- **해결**: RDS 인스턴스 파라미터 그룹을 생성해 타임존 설정을 바꾸고, Docker에도 타임존 환경변수 추가
+
+</details>
+
+<details>
+<summary><b>상윤</b> — 캐시 기능 구현 트러블슈팅 작성</summary>
+
+- [캐시 기능 구현 트러블슈팅 작성](https://velog.io/@soulsin2/%EC%BA%90%EC%8B%9C-%EA%B8%B0%EB%8A%A5-%EA%B5%AC%ED%98%84-%ED%8A%B8%EB%9F%AC%EB%B8%94%EC%8A%88%ED%8C%85-%EC%9E%91%EC%84%B1)
+
+</details>
+
+<details>
+<summary><b>현정</b> — 챗봇 명령어 처리 아키텍처 개선 및 설계 결정 · GitHub Actions CI 빌드 실패 트러블슈팅</summary>
+
+- [챗봇 명령어 처리 아키텍처 개선 및 설계 결정](https://www.notion.so/3de9b79e9af880efbbc7f446eae887f6?v=08deae237f6b44ec9ebf7d9c0ab283ac&source=copy_link)
+- [GitHub Actions CI 빌드 실패 트러블슈팅](https://www.notion.so/GitHub-Actions-CI-3de9b79e9af880ea87f4de51c6376866?v=08deae237f6b44ec9ebf7d9c0ab283ac&source=copy_link)
+
+</details>
 
 ---
 
