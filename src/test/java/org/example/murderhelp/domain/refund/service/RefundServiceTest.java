@@ -99,6 +99,9 @@ class RefundServiceTest {
                 .when(order.getMember())
                 .thenReturn(member);
 
+        lenient().when(order.getStatus())
+                .thenReturn(OrderStatus.PAID);
+
         payment = mock(Payment.class);
 
         lenient()

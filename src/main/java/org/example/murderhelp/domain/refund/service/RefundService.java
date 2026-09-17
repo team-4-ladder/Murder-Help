@@ -9,7 +9,6 @@ import org.example.murderhelp.domain.payment.entity.Payment;
 import org.example.murderhelp.domain.payment.repository.dto.PaymentWithItems;
 import org.example.murderhelp.domain.payment.service.PaymentService;
 import org.example.murderhelp.domain.product.repository.ProductRepository;
-import org.example.murderhelp.domain.product.service.ProductService;
 import org.example.murderhelp.domain.refund.component.RefundCalculator;
 import org.example.murderhelp.domain.refund.dto.RefundHistoryResponse;
 import org.example.murderhelp.domain.refund.dto.RefundRequest;
@@ -78,7 +77,7 @@ public class RefundService {
         Map<Long, Integer> refundedMap = refundItemRepository.findRefundedQuantitiesByOrderItemIds(itemIds).stream()
                 .collect(toMap(
                         RefundedQuantity::orderItemId,
-                        rq -> rq.refundedQuantity().intValue()
+                        RefundedQuantity::refundedQuantity
                 ));
 
         return orderItems.stream().collect(toMap(
@@ -115,6 +114,11 @@ public class RefundService {
         List<OrderItem> orderItems = paymentWithItems.orderItems();
 
         List<RefundWithItems> existingRefunds = refundRepository.findByPaymentIdWithItems(request.paymentId());
+
+        // 배송이 시작된 이후(준비중/배송중/완료)에는 환불 신청 자체를 막는다
+        if (payment.getOrder().getStatus() != OrderStatus.PAID) {
+            throw new BusinessException(ErrorCode.REFUND_NOT_ALLOWED_AFTER_DELIVERY);
+        }
 
         /* 5초 이내에 동일한 결제건으로 환불된 내역이 있는지 확인 (메모리에서 처리)*/
         boolean isDuplicated = existingRefunds.stream()
