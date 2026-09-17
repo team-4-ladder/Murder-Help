@@ -10,7 +10,7 @@ import { RefundModal } from "./RefundModal";
 const STEPS: OrderStatus[] = ["PAID", "PREPARING_DELIVERY", "SHIPPING", "DELIVERED"];
 
 function canRequestRefund(status: OrderStatus) {
-  return status !== "PENDING_PAYMENT" && status !== "CANCELED";
+    return status === "PAID";
 }
 
 const REFUND_STATUS_LABEL: Record<RefundHistory["status"], string> = {

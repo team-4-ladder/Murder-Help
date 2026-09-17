@@ -69,6 +69,8 @@ public enum ErrorCode {
     REFUND_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "REFUND_006", "DB와 PG사의 결제 잔액이 일치하지 않습니다."),
     DUPLICATE_REFUND_REQUEST(HttpStatus.TOO_MANY_REQUESTS, "REFUND_007", "환불 처리가 진행 중입니다. 잠시 후 다시 시도해주세요."),
     INVALID_REFUND_QUANTITY(HttpStatus.BAD_REQUEST, "REFUND_008", "수량은 1 이상이어야 합니다."),
+    REFUND_NOT_ALLOWED_AFTER_DELIVERY(HttpStatus.BAD_REQUEST, "REFUND_009", "배송이 시작된 상품은 환불할 수 없습니다."),
+
 
     // Chat
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

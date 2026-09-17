@@ -116,6 +116,11 @@ public class RefundService {
 
         List<RefundWithItems> existingRefunds = refundRepository.findByPaymentIdWithItems(request.paymentId());
 
+        // 배송이 시작된 이후(준비중/배송중/완료)에는 환불 신청 자체를 막는다
+        if (payment.getOrder().getStatus() != OrderStatus.PAID) {
+            throw new BusinessException(ErrorCode.REFUND_NOT_ALLOWED_AFTER_DELIVERY);
+        }
+
         /* 5초 이내에 동일한 결제건으로 환불된 내역이 있는지 확인 (메모리에서 처리)*/
         boolean isDuplicated = existingRefunds.stream()
                 .anyMatch(x -> x.refund().getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(5)));
