@@ -1,11 +1,18 @@
-export type ChatRoomStatus = "WAITING" | "IN_PROGRESS" | "COMPLETED";
+import type { Member } from "../../api/auth";
+
+export type ChatRoomStatus = "BOT_MODE" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 
 export interface ChatRoomResponse {
   roomId: number;
   title: string;
   status: ChatRoomStatus;
   createdAt: string;
+  updatedAt: string;
   lastMessage?: string;
+  customerProfileImageUrl?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerGrade?: Member["grade"] | null;
 }
 
 export type ChatMessageType = "TEXT" | "SYSTEM" | "BUTTON";
@@ -16,9 +23,10 @@ export interface ChatMessageResponse {
   memberId: number;
   senderEmail: string;
   senderName: string;
-  senderGrade?: string;
+  senderGrade?: Member["grade"];
+  senderProfileImageUrl?: string | null;
   content: string;
-  messageType: "TEXT" | "SYSTEM" | "BUTTON";
+  messageType: ChatMessageType;
   createdAt: string;
 }
 
@@ -30,6 +38,12 @@ export interface PageResponse<T> {
   number: number;
   numberOfElements: number;
   totalElements: number;
+}
+
+export interface CursorPageResponse<T> {
+  content: T[];
+  hasNext: boolean;
+  nextCursorId: number | null;
 }
 
 export interface BotOptionDto {
@@ -44,7 +58,10 @@ export interface BotProductDto {
 }
 
 export interface BotMessageDto {
-  text: string;
+  title?: string;
+  text?: string;
+  orderId?: number;
+  orderStatus?: string;
   options?: BotOptionDto[];
   products?: BotProductDto[];
 }

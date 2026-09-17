@@ -1,17 +1,15 @@
 package org.example.murderhelp.domain.chat.repository;
 
-import com.querydsl.jpa.impl.JPAQuery;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.entity.ChatMessage;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 import static org.example.murderhelp.domain.chat.entity.QChatMessage.chatMessage;
+import static org.example.murderhelp.domain.member.entity.QMember.member;
 
 @Repository
 @RequiredArgsConstructor
@@ -20,20 +18,20 @@ public class ChatMessageRepositoryImpl implements ChatMessageRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<ChatMessage> findMessagesByRoomId(Long roomId, Pageable pageable) {
-        List<ChatMessage> content = queryFactory
+    public List<ChatMessage> findMessagesByCursor(Long roomId, Long lastMessageId, int limit) {
+        return queryFactory
                 .selectFrom(chatMessage)
-                .where(chatMessage.chatRoom.id.eq(roomId))
-                .orderBy(chatMessage.createdAt.desc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
+                .join(chatMessage.sender, member).fetchJoin()
+                .where(
+                        chatMessage.chatRoom.id.eq(roomId),
+                        ltLastMessageId(lastMessageId)
+                )
+                .orderBy(chatMessage.id.desc())
+                .limit(limit)
                 .fetch();
+    }
 
-        JPAQuery<Long> countQuery = queryFactory
-                .select(chatMessage.count())
-                .from(chatMessage)
-                .where(chatMessage.chatRoom.id.eq(roomId));
-
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    private BooleanExpression ltLastMessageId(Long lastMessageId) {
+        return lastMessageId != null ? chatMessage.id.lt(lastMessageId) : null;
     }
 }

@@ -160,10 +160,11 @@ export async function fetchMyOrders(
   };
 }
 
-/** GET /api/orders/{orderId} — 주문 단건 상세 조회 (환불 후 갱신 등에 사용) */
-export async function fetchOrder(orderId: number): Promise<OrderData> {
+/** GET /api/orders/{orderId} — 주문 단건 상세 조회 (상세 화면 진입 · 환불 후 갱신에 사용) */
+export async function fetchOrder(orderId: number, signal?: AbortSignal): Promise<OrderData> {
   const response = await authFetch(`/api/orders/${orderId}`, {
     headers: { Accept: "application/json" },
+    signal,
   });
 
   const body = (await response.json().catch(() => null)) as ApiResponse<OrderData> | null;

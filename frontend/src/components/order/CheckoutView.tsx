@@ -11,12 +11,10 @@ import { PageTitle } from "../common/PageTitle";
 import { Spinner } from "../common/Spinner";
 import { SummaryRow } from "../common/SummaryRow";
 
-/* ─── checkout ───────────────────────────────────────────── */
 export function CheckoutView({
                                lines, cartItemIds, onBack, onDone,
                              }: {
   lines: { p: Product; qty: number }[];
-  /* 주문 생성 API에 보낼 장바구니 항목 ID */
   cartItemIds: number[];
   onBack: () => void;
   onDone: (orderNo: string, total: number) => void;
@@ -26,14 +24,12 @@ export function CheckoutView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  /* 결제창 호출에 필요한 구매자 이메일 — 로그인한 회원 정보에서 가져온다 */
   useEffect(() => {
     getMyProfile()
         .then((profile) => setEmail(profile.email))
         .catch(() => setError("회원 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요."));
   }, []);
 
-  /* 배송비 없음 — 상품 합계가 곧 결제 금액 */
   const total = lines.reduce((sum, l) => sum + l.p.price * l.qty, 0);
 
   const set = (k: keyof Receiver) => (v: string) => setR((prev) => ({ ...prev, [k]: v }));
@@ -108,13 +104,12 @@ export function CheckoutView({
           ← 장바구니로
         </button>
 
-        <PageTitle note="// 배송 정보를 입력해 주세요">Checkout</PageTitle>
+        <PageTitle note="배송 정보를 입력해 주세요">Checkout</PageTitle>
 
         <form onSubmit={submit} className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* 배송 정보 */}
           <div className="flex-1 w-full p-6" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
             <div className="text-[10px] uppercase tracking-widest mb-5" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-              // 배송지
+              배송지
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -148,7 +143,6 @@ export function CheckoutView({
             </div>
           </div>
 
-          {/* 주문 요약 */}
           <div className="w-full lg:w-80 shrink-0 p-5" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
             <OrderSummaryHeader itemCount={lines.length} />
 

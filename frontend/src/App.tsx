@@ -19,10 +19,12 @@ import {
   type PopularSearch,
   type ProductDetailData,
 } from "./api/products";
-import {NAV_ITEMS, Product, SUBCATS, type Tier} from "./catalog";
+import {NAV_ITEMS, SUBCATS, type Tier} from "./catalog";
 import { Gate } from "./components/auth/Gate";
 import { LoginModal } from "./components/auth/LoginModal";
+import { ProductRankingAdmin } from "./components/admin/ProductRankingAdmin";
 import { getMe, logout } from "./api/auth";
+import { getMySpending } from "./api/member";
 import { onAuthExpired, reissue } from "./api/client";
 import { CartView } from "./components/cart/CartView";
 import { FloatingChatWidget } from "./components/chat/FloatingChatWidget";
@@ -38,7 +40,7 @@ import { ProductDetail } from "./components/product/ProductDetail";
 import { Sidebar } from "./components/product/Sidebar";
 import { drop, read, SESSION_KEY, write } from "./lib/storage";
 import { C } from "./lib/theme";
-import { canAccess, spentFromGrade, TIERS, tierFor } from "./lib/tier";
+import { canAccess, TIERS, tierFor } from "./lib/tier";
 
 /* ─── 세션 ───────────────────────────────────────────────── */
 /* 등급은 저장하지 않는다. spent 에서 계산하므로 저장하면 두 값이 어긋난다. */
@@ -75,38 +77,39 @@ function toCartProduct(item: CartItemDetailData): ApiProduct {
 
 /* ─── 화면 ───────────────────────────────────────────────── */
 type View =
-  | { name: "list" }
-  | { name: "detail"; id: string }
-  | { name: "cart" }
-  | { name: "checkout" }
-  | { name: "done"; orderNo: string; total: number }
-  | { name: "mypage" };
+    | { name: "list" }
+    | { name: "detail"; id: string }
+    | { name: "cart" }
+    | { name: "checkout" }
+    | { name: "done"; orderNo: string; total: number }
+    | { name: "mypage"; section?: "orders"; orderId?: number }
+    | { name: "admin" };
 
 /* ─── 공통 조각 ──────────────────────────────────────────── */
 function Field({
-  label, value, onChange, placeholder, type = "text",
-}: {
+                 label, value, onChange, placeholder, type = "text",
+               }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
 }) {
   return (
-    <label className="block">
+      <label className="block">
       <span className="block text-[10px] uppercase tracking-widest mb-1.5" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
         {label}
       </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-4 py-3 text-sm outline-none"
-        style={{
-          background: "rgba(0,0,0,0.45)",
-          border: `1px solid ${C.panelBorder}`,
-          color: C.text,
-          fontFamily: "Noto Sans KR, sans-serif",
-        }}
-      />
-    </label>
+        <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full px-4 py-3 text-sm outline-none"
+            style={{
+              background: "rgba(0,0,0,0.45)",
+              border: `1px solid ${C.panelBorder}`,
+              color: C.text,
+              fontFamily: "Noto Sans KR, sans-serif",
+            }}
+        />
+      </label>
   );
 }
 
@@ -120,40 +123,40 @@ function QtyStepper({ qty, onChange }: { qty: number; onChange: (n: number) => v
     background: "rgba(0,0,0,0.4)",
   };
   return (
-    <div className="flex items-center">
-      <button type="button" onClick={() => onChange(Math.max(1, qty - 1))} style={btn} aria-label="수량 줄이기">−</button>
-      <span className="text-sm text-center" style={{ width: 46, color: C.text, fontFamily: "Share Tech Mono" }}>
+      <div className="flex items-center">
+        <button type="button" onClick={() => onChange(Math.max(1, qty - 1))} style={btn} aria-label="수량 줄이기">−</button>
+        <span className="text-sm text-center" style={{ width: 46, color: C.text, fontFamily: "Share Tech Mono" }}>
         {qty}
       </span>
-      <button type="button" onClick={() => onChange(Math.min(99, qty + 1))} style={btn} aria-label="수량 늘리기">+</button>
-    </div>
+        <button type="button" onClick={() => onChange(Math.min(99, qty + 1))} style={btn} aria-label="수량 늘리기">+</button>
+      </div>
   );
 }
 
 function PageTitle({ children, note }: { children: ReactNode; note?: string }) {
   return (
-    <div className="mb-6">
-      <h1
-        className="font-bold uppercase leading-none mb-2"
-        style={{ fontFamily: "Cinzel, serif", fontSize: "clamp(20px,3vw,32px)", color: C.text }}
-      >
-        {children}
-      </h1>
-      {note && (
-        <p className="text-xs" style={{ color: C.textDim, fontFamily: "Share Tech Mono" }}>
-          {note}
-        </p>
-      )}
-    </div>
+      <div className="mb-6">
+        <h1
+            className="font-bold uppercase leading-none mb-2"
+            style={{ fontFamily: "Cinzel, serif", fontSize: "clamp(20px,3vw,32px)", color: C.text }}
+        >
+          {children}
+        </h1>
+        {note && (
+            <p className="text-xs" style={{ color: C.textDim, fontFamily: "Share Tech Mono" }}>
+              {note}
+            </p>
+        )}
+      </div>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-baseline py-1.5">
-      <span className="text-xs" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif" }}>{label}</span>
-      <span className="text-sm" style={{ color: C.text, fontFamily: "Share Tech Mono" }}>{value}</span>
-    </div>
+      <div className="flex justify-between items-baseline py-1.5">
+        <span className="text-xs" style={{ color: C.textDim, fontFamily: "Noto Sans KR, sans-serif" }}>{label}</span>
+        <span className="text-sm" style={{ color: C.text, fontFamily: "Share Tech Mono" }}>{value}</span>
+      </div>
   );
 }
 
@@ -183,15 +186,6 @@ export default function App() {
   const [activeNav, setActiveNav] = useState("Guns");
   const [activeSub, setActiveSub] = useState("전체");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [knownProducts, setKnownProducts] = useState<Product[]>([]);
-  const [productSort, setProductSort] = useState<ApiProductSort>("POPULAR");
-  const [productPage, setProductPage] = useState(1);
-  const [productTotal, setProductTotal] = useState(0);
-  const [hasNextProducts, setHasNextProducts] = useState(false);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsError, setProductsError] = useState<string | null>(null);
-  const [productReloadKey, setProductReloadKey] = useState(0);
 
   /* ── 상품 목록/검색/상세 (백엔드 연동) ──
      상품 코드는 기존 화면과 장바구니 식별자로 유지하고,
@@ -239,17 +233,23 @@ export default function App() {
     navigate({ name: "list" });
   }
 
+  function clearSearch() {
+    pendingPopularSearch.current = null;
+    setSearchInput("");
+    setSearchKeyword("");
+  }
+
   useEffect(() => {
     if (!searchFocused || searchInput.trim()) return;
 
     let cancelled = false;
     fetchPopularSearches()
-      .then((searches) => {
-        if (!cancelled) setPopularSearches(searches);
-      })
-      .catch(() => {
-        if (!cancelled) setPopularSearches([]);
-      });
+        .then((searches) => {
+          if (!cancelled) setPopularSearches(searches);
+        })
+        .catch(() => {
+          if (!cancelled) setPopularSearches([]);
+        });
 
     return () => {
       cancelled = true;
@@ -262,14 +262,14 @@ export default function App() {
      page=0 도 첫 페이지로 처리되므로, 0부터 세면 '더 보기'에서 첫 페이지가 한 번 더 온다. */
   function requestPage(page: number) {
     return isSearching
-      ? searchProducts({
+        ? searchProducts({
           keyword: searchKeyword,
           tier: activeCodeTab,
           sort: sortKey,
           page,
           size: PAGE_SIZE,
         })
-      : fetchProductList({
+        : fetchProductList({
           category: activeNav,
           subCategory: activeSub === "전체" ? undefined : activeSub,
           tier: activeCodeTab,
@@ -289,32 +289,32 @@ export default function App() {
     setListMoreError(false);
 
     requestPage(1)
-      .then((res) => {
-        if (cancelled) return;
-        setListItems(res.items);
-        setListPage(1);
-        setListHasNext(res.hasNext);
-        setListTotal(res.totalElements);
-        cacheProducts(res.items);
+        .then((res) => {
+          if (cancelled) return;
+          setListItems(res.items);
+          setListPage(1);
+          setListHasNext(res.hasNext);
+          setListTotal(res.totalElements);
+          cacheProducts(res.items);
 
-        if (pendingPopularSearch.current === searchKeyword && searchKeyword) {
-          pendingPopularSearch.current = null;
-          recordPopularSearch(searchKeyword).catch(() => undefined);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        if (pendingPopularSearch.current === searchKeyword) {
-          pendingPopularSearch.current = null;
-        }
-        setListItems([]);
-        setListHasNext(false);
-        setListTotal(0);
-        setListError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setListLoading(false);
-      });
+          if (pendingPopularSearch.current === searchKeyword && searchKeyword) {
+            pendingPopularSearch.current = null;
+            recordPopularSearch(searchKeyword).catch(() => undefined);
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (pendingPopularSearch.current === searchKeyword) {
+            pendingPopularSearch.current = null;
+          }
+          setListItems([]);
+          setListHasNext(false);
+          setListTotal(0);
+          setListError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setListLoading(false);
+        });
 
     return () => {
       cancelled = true;
@@ -329,15 +329,15 @@ export default function App() {
     setListMoreError(false);
 
     requestPage(nextPage)
-      .then((res) => {
-        setListItems((prev) => [...prev, ...res.items]);
-        setListPage(nextPage);
-        setListHasNext(res.hasNext);
-        cacheProducts(res.items);
-      })
-      /* 이미 보이는 목록은 그대로 두고, 버튼 아래에 실패만 알려서 다시 누를 수 있게 한다 */
-      .catch(() => setListMoreError(true))
-      .finally(() => setListLoading(false));
+        .then((res) => {
+          setListItems((prev) => [...prev, ...res.items]);
+          setListPage(nextPage);
+          setListHasNext(res.hasNext);
+          cacheProducts(res.items);
+        })
+        /* 이미 보이는 목록은 그대로 두고, 버튼 아래에 실패만 알려서 다시 누를 수 있게 한다 */
+        .catch(() => setListMoreError(true))
+        .finally(() => setListLoading(false));
   }
 
   const detailProductId = view.name === "detail" ? Number(view.id) : null;
@@ -363,17 +363,17 @@ export default function App() {
     setDetailError(null);
 
     fetchProductDetail(detailProductId, controller.signal)
-      .then((product) => {
-        setDetailProduct(product);
-        cacheProducts([product]);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setDetailError(error instanceof Error ? error.message : "상품 상세정보를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setDetailLoading(false);
-      });
+        .then((product) => {
+          setDetailProduct(product);
+          cacheProducts([product]);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setDetailError(error instanceof Error ? error.message : "상품 상세정보를 불러오지 못했습니다.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setDetailLoading(false);
+        });
 
     return () => controller.abort();
     // cacheProducts는 상태 갱신 헬퍼이므로 상세조회 재실행 조건에서 제외한다.
@@ -397,33 +397,33 @@ export default function App() {
     setCartError(null);
 
     fetchCartItems()
-      .then((items) => {
-        if (cancelled) return;
+        .then((items) => {
+          if (cancelled) return;
 
-        const products = items.map(toCartProduct);
-        setProductCache((prev) => {
-          const next = { ...prev };
-          for (const product of products) next[product.id] = product;
-          return next;
+          const products = items.map(toCartProduct);
+          setProductCache((prev) => {
+            const next = { ...prev };
+            for (const product of products) next[product.id] = product;
+            return next;
+          });
+          setCart(items.map((item) => ({
+            id: item.productCode,
+            qty: item.quantity,
+            status: item.status,
+            stockQuantity: item.stockQuantity,
+          })));
+          setCartItemIds(
+              Object.fromEntries(items.map((item) => [item.productCode, item.id]))
+          );
+          setSelectedCartIds(new Set(items.map((item) => item.productCode)));
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          setCartError(error instanceof Error ? error.message : "장바구니를 불러오지 못했습니다.");
+        })
+        .finally(() => {
+          if (!cancelled) setCartLoading(false);
         });
-        setCart(items.map((item) => ({
-          id: item.productCode,
-          qty: item.quantity,
-          status: item.status,
-          stockQuantity: item.stockQuantity,
-        })));
-        setCartItemIds(
-          Object.fromEntries(items.map((item) => [item.productCode, item.id]))
-        );
-        setSelectedCartIds(new Set(items.map((item) => item.productCode)));
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setCartError(error instanceof Error ? error.message : "장바구니를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!cancelled) setCartLoading(false);
-      });
 
     return () => {
       cancelled = true;
@@ -451,11 +451,20 @@ export default function App() {
         return;
       }
 
-      /* 등급은 로그인한 뒤에도 바뀔 수 있어서 저장된 값 대신 서버 값을 쓴다.
-         회원 정보 조회만 실패했다면 저장된 세션으로 계속 진행한다. */
+      /* 등급과 누적 구매금액은 로그인한 뒤에도 바뀔 수 있으므로 서버 값을 다시 조회한다. */
       try {
-        const member = await getMe();
-        if (!cancelled) applyMember(String(member.id), spentFromGrade(member.grade), member.grade.toLowerCase() as Tier);
+        const [member, spending] = await Promise.all([
+          getMe(),
+          getMySpending(),
+        ]);
+
+        if (!cancelled) {
+          applyMember(
+              String(member.id),
+              spending.netSpentAmount,
+              member.grade.toLowerCase() as Tier,
+          );
+        }
       } catch (error) {
         console.error(error);
       }
@@ -515,7 +524,7 @@ export default function App() {
     setActiveNav("Guns");
     setActiveSub("전체");
     setMenuOpen(false);
-    setSearchInput("");
+    clearSearch();
     navigate({ name: "list" });
   }
 
@@ -531,7 +540,21 @@ export default function App() {
     setActiveCodeTab(tier === "green" ? "red" : tier);
   }
 
+  async function refreshMemberState() {
+    const [member, spending] = await Promise.all([
+      getMe(),
+      getMySpending(),
+    ]);
+
+    applyMember(
+        String(member.id),
+        spending.netSpentAmount,
+        member.grade.toLowerCase() as Tier,
+    );
+  }
+
   function handleLogin(id: string, spent: number, grade?: Tier) {
+    /* 로그인 모달의 기존 콜백 계약은 유지하고, 실제 금액은 서버 조회 후 교체한다. */
     applyMember(id, spent, grade);
     setShowLogin(false);
 
@@ -539,6 +562,10 @@ export default function App() {
     setCart([]);
     setCartItemIds({});
     setSelectedCartIds(new Set());
+
+    void refreshMemberState().catch((error) => {
+      console.error("누적 구매금액을 불러오지 못했습니다.", error);
+    });
   }
 
   async function handleLogout() {
@@ -560,17 +587,23 @@ export default function App() {
     setActiveNav(cat);
     setActiveSub("전체");
     setMenuOpen(false);
-    setSearchInput("");
+    clearSearch();
+    navigate({ name: "list" });
+  }
+
+  function changeSubCategory(subCategory: string) {
+    setActiveSub(subCategory);
+    clearSearch();
     navigate({ name: "list" });
   }
 
   /* ── 장바구니 ── */
   const cartLines = cart
-    .map((line) => {
-      const p = productCache[line.id];
-      return p ? { p, qty: line.qty, status: line.status, stockQuantity: line.stockQuantity } : null;
-    })
-    .filter((l): l is NonNullable<typeof l> => l !== null);
+      .map((line) => {
+        const p = productCache[line.id];
+        return p ? { p, qty: line.qty, status: line.status, stockQuantity: line.stockQuantity } : null;
+      })
+      .filter((l): l is NonNullable<typeof l> => l !== null);
 
   const cartCount = cart.length;
   const cartBadgeValue = cartCount > 0 ? cartCount : session && (!authReady || cartLoading) ? "…" : null;
@@ -579,8 +612,8 @@ export default function App() {
 
   /* 선택 상품 주문 API는 상품 코드가 아니라 실제 장바구니 항목 ID로 요청한다. */
   const selectedCartLineIds = selectedCartLines
-    .map(({ p }) => cartItemIds[p.id])
-    .filter((id): id is number => id !== undefined);
+      .map(({ p }) => cartItemIds[p.id])
+      .filter((id): id is number => id !== undefined);
 
   /* 서버 장바구니에 담긴 경우에만 화면 장바구니에도 반영한다. */
   async function addToCart(id: string, qty: number): Promise<boolean> {
@@ -595,7 +628,7 @@ export default function App() {
       const found = prev.some((line) => line.id === id);
       if (found) {
         return prev.map((line) =>
-          line.id === id ? { ...line, qty: savedItem.quantity } : line
+            line.id === id ? { ...line, qty: savedItem.quantity } : line
         );
       }
       return [...prev, { id, qty: savedItem.quantity }];
@@ -615,7 +648,7 @@ export default function App() {
     try {
       const updatedItem = await updateCartItemQuantity(cartItemId, qty);
       setCart((prev) =>
-        prev.map((line) => line.id === id ? { ...line, qty: updatedItem.quantity } : line)
+          prev.map((line) => line.id === id ? { ...line, qty: updatedItem.quantity } : line)
       );
       setCartReloadKey((key) => key + 1);
     } catch (error) {
@@ -722,457 +755,474 @@ export default function App() {
     setSelectedCartIds(new Set());
     setCartReloadKey((key) => key + 1);
 
-    /* 누적 구매금액과 등급은 서버가 관리하므로 화면에서 따로 계산하지 않는다. */
+    /* 결제 완료 후 서버에 반영된 누적 구매금액과 등급을 다시 조회한다. */
+    void refreshMemberState().catch((error) => {
+      console.error("결제 후 회원 등급 정보를 갱신하지 못했습니다.", error);
+    });
 
     /* 주문서를 완료 화면으로 대체한다 — 뒤로 가기로 비워진 주문서에 돌아가지 않도록 */
     navigate({ name: "done", orderNo, total }, true);
   }
-
-  /* 카테고리, 서브 카테고리, 등급, 정렬 조건은 백엔드가 적용한다. */
-  const filtered = products;
-
 
   /* 뒤로 가기로 예전 세션의 상위 등급 상품에 돌아올 수 있으므로 여기서도 막는다 */
   const detailAllowed = detailProduct !== null && canAccess(userTier, detailProduct.tier);
   const onListPage = view.name === "list";
 
   return (
-    <div className="min-h-full" style={{ background: C.bg, color: C.text, fontFamily: "Noto Sans KR, sans-serif", minHeight: "100vh" }}>
-      <style>{`@keyframes mh-spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="min-h-full" style={{ background: C.bg, color: C.text, fontFamily: "Noto Sans KR, sans-serif", minHeight: "100vh" }}>
+        <style>{`@keyframes mh-spin { to { transform: rotate(360deg); } }`}</style>
 
-      {showLogin && (
-        <LoginModal onLogin={handleLogin} onClose={() => setShowLogin(false)} />
-      )}
+        {showLogin && (
+            <LoginModal onLogin={handleLogin} onClose={() => setShowLogin(false)} />
+        )}
 
-      {/* ── HEADER ─────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-50"
-        style={{ background: "rgba(12,0,0,0.93)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.panelBorder}` }}
-      >
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8">
-          <div className="flex items-center justify-between h-14">
-            {/* Logo */}
-            <button className="flex items-center gap-3" onClick={goHome}>
-              <div className="w-7 h-7 flex items-center justify-center text-[10px] font-black"
-                style={{ background: C.red, color: "#fff", fontFamily: "Cinzel, serif" }}>
-                MH
-              </div>
-              <span className="font-bold uppercase tracking-wider text-base" style={{ fontFamily: "Cinzel, serif" }}>
+        {/* ── HEADER ─────────────────────────────────── */}
+        <header
+            className="sticky top-0 z-50"
+            style={{ background: "rgba(12,0,0,0.93)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.panelBorder}` }}
+        >
+          <div className="max-w-[1280px] mx-auto px-4 md:px-8">
+            <div className="flex items-center justify-between h-14">
+              {/* Logo */}
+              <button className="flex items-center gap-3" onClick={goHome}>
+                <div className="w-7 h-7 flex items-center justify-center text-[10px] font-black"
+                     style={{ background: C.red, color: "#fff", fontFamily: "Cinzel, serif" }}>
+                  MH
+                </div>
+                <span className="font-bold uppercase tracking-wider text-base" style={{ fontFamily: "Cinzel, serif" }}>
                 Murder<span style={{ color: C.redBright }}>Help</span>
               </span>
-            </button>
+              </button>
 
-            {/* Desktop nav */}
-            <nav className="hidden md:flex items-center h-full">
-              {NAV_ITEMS.map((item, i) => {
-                const active = onListPage && activeNav === item;
-                return (
-                  <button
-                    key={item}
-                    onClick={() => changeNav(item)}
-                    className="px-4 h-14 text-sm font-semibold uppercase tracking-widest transition-colors relative"
-                    style={{
-                      fontFamily: "Cinzel, serif",
-                      fontSize: 12,
-                      color: active ? C.text : C.textDim,
-                      borderBottom: active ? `2px solid ${C.redBright}` : "2px solid transparent",
-                    }}
-                    onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
-                    onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = C.textDim; }}
-                  >
-                    {item}
-                    {i < NAV_ITEMS.length - 1 && (
-                      <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs" style={{ color: C.redDim }}>|</span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Right actions */}
-            <div className="flex items-center gap-3">
-              {/* search */}
-              <div className="relative hidden md:flex items-center gap-2 px-3 py-1.5 text-xs"
-                style={{ background: "rgba(0,0,0,0.5)", border: `1px solid ${C.panelBorder}` }}>
-                <button type="button" onClick={() => submitSearch()} aria-label="검색">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-                  </svg>
-                </button>
-                <input
-                  value={searchInput}
-                  onChange={(e) => handleSearchInputChange(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitSearch();
-                  }}
-                  placeholder="검색..."
-                  className="bg-transparent outline-none w-20 text-xs"
-                  style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}
-                />
-                {searchFocused && !searchInput.trim() && popularSearches.length > 0 && (
-                  <div
-                    className="absolute top-full left-0 z-50 mt-2 w-52 p-2"
-                    style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
-                  >
-                    <p className="px-2 py-1 text-[10px] tracking-widest" style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
-                      POPULAR SEARCHES
-                    </p>
-                    {popularSearches.map((search) => (
+              {/* Desktop nav */}
+              <nav className="hidden md:flex items-center h-full">
+                {NAV_ITEMS.map((item, i) => {
+                  const active = onListPage && activeNav === item;
+                  return (
                       <button
-                        key={search.keyword}
-                        type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          submitSearch(search.keyword);
-                        }}
-                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs"
-                        style={{ color: C.textDim }}
+                          key={item}
+                          onClick={() => changeNav(item)}
+                          className="px-4 h-14 text-sm font-semibold uppercase tracking-widest transition-colors relative"
+                          style={{
+                            fontFamily: "Cinzel, serif",
+                            fontSize: 12,
+                            color: active ? C.text : C.textDim,
+                            borderBottom: active ? `2px solid ${C.redBright}` : "2px solid transparent",
+                          }}
+                          onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
+                          onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = C.textDim; }}
                       >
-                        <span style={{ color: C.red, fontFamily: "Share Tech Mono" }}>{search.rank}</span>
-                        <span className="truncate">{search.keyword}</span>
+                        {item}
+                        {i < NAV_ITEMS.length - 1 && (
+                            <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs" style={{ color: C.redDim }}>|</span>
+                        )}
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  );
+                })}
+              </nav>
 
-              {/* cart */}
-              <button
-                onClick={openCart}
-                className="relative flex items-center justify-center transition-all"
-                style={{ width: 34, height: 30, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
-                aria-label="장바구니"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" />
-                  <path d="M2 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 7H6" />
-                </svg>
-                {cartBadgeValue !== null && (
-                  <span
-                    className="absolute -top-1.5 -right-1.5 text-[9px] font-bold flex items-center justify-center"
-                    style={{
-                      minWidth: 16, height: 16, padding: "0 3px",
-                      background: C.red, color: "#fff", fontFamily: "Share Tech Mono",
-                    }}
-                  >
+              {/* Right actions */}
+              <div className="flex items-center gap-3">
+                {/* search */}
+                <div className="relative hidden md:flex items-center gap-2 px-3 py-1.5 text-xs"
+                     style={{ background: "rgba(0,0,0,0.5)", border: `1px solid ${C.panelBorder}` }}>
+                  <button type="button" onClick={() => submitSearch()} aria-label="검색">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                    </svg>
+                  </button>
+                  <input
+                      value={searchInput}
+                      onChange={(e) => handleSearchInputChange(e.target.value)}
+                      onFocus={() => setSearchFocused(true)}
+                      onBlur={() => setSearchFocused(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitSearch();
+                      }}
+                      placeholder="검색..."
+                      className="bg-transparent outline-none w-20 text-xs"
+                      style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}
+                  />
+                  {searchFocused && !searchInput.trim() && popularSearches.length > 0 && (
+                      <div
+                          className="absolute top-full left-0 z-50 mt-2 w-52 p-2"
+                          style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}
+                      >
+                        <p className="px-2 py-1 text-[10px] tracking-widest" style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
+                          POPULAR SEARCHES
+                        </p>
+                        {popularSearches.map((search) => (
+                            <button
+                                key={search.keyword}
+                                type="button"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  submitSearch(search.keyword);
+                                }}
+                                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs"
+                                style={{ color: C.textDim }}
+                            >
+                              <span style={{ color: C.red, fontFamily: "Share Tech Mono" }}>{search.rank}</span>
+                              <span className="truncate">{search.keyword}</span>
+                            </button>
+                        ))}
+                      </div>
+                  )}
+                </div>
+
+                {/* cart */}
+                <button
+                    onClick={openCart}
+                    className="relative flex items-center justify-center transition-all"
+                    style={{ width: 34, height: 30, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
+                    aria-label="장바구니"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" />
+                    <path d="M2 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 7H6" />
+                  </svg>
+                  {cartBadgeValue !== null && (
+                      <span
+                          className="absolute -top-1.5 -right-1.5 text-[9px] font-bold flex items-center justify-center"
+                          style={{
+                            minWidth: 16, height: 16, padding: "0 3px",
+                            background: C.red, color: "#fff", fontFamily: "Share Tech Mono",
+                          }}
+                      >
                     {cartBadgeValue}
                   </span>
-                )}
-              </button>
-
-              {/* auth */}
-              {userTier ? (
-                <div className="flex items-center gap-2">
-                  <TierBadge tier={userTier} />
-                  <button
-                    onClick={handleLogout}
-                    className="text-xs px-3 py-1.5 uppercase tracking-wider transition-all"
-                    style={{ border: `1px solid ${C.panelBorder}`, color: C.textMuted, fontFamily: "Share Tech Mono" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text; (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.textMuted; (e.currentTarget as HTMLButtonElement).style.borderColor = C.panelBorder; }}
-                  >
-                    Logout
-                  </button>
-                  <button
-                    onClick={() => navigate({ name: "mypage" })}
-                    className="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 uppercase tracking-wider transition-all"
-                    style={{
-                      border: `1px solid ${view.name === "mypage" ? C.red : C.panelBorder}`,
-                      color: view.name === "mypage" ? C.text : C.textDim,
-                      fontFamily: "Share Tech Mono",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text; (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; }}
-                    onMouseLeave={(e) => {
-                      const on = view.name === "mypage";
-                      (e.currentTarget as HTMLButtonElement).style.color = on ? C.text : C.textDim;
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = on ? C.red : C.panelBorder;
-                    }}
-                  >
-                    마이페이지
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="text-xs font-bold px-4 py-1.5 uppercase tracking-wider transition-all"
-                  style={{ background: C.red, color: "#fff", fontFamily: "Share Tech Mono" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.redBright; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.red; }}
-                >
-                  Login
+                  )}
                 </button>
-              )}
 
-              {/* mobile menu */}
-              <button className="md:hidden" style={{ color: C.textDim }} onClick={() => setMenuOpen(!menuOpen)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
+                {/* auth */}
+                {userTier ? (
+                    <div className="flex items-center gap-2">
+                      <TierBadge tier={userTier} />
+                      <button
+                          onClick={handleLogout}
+                          className="text-xs px-3 py-1.5 uppercase tracking-wider transition-all"
+                          style={{ border: `1px solid ${C.panelBorder}`, color: C.textMuted, fontFamily: "Share Tech Mono" }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text; (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.textMuted; (e.currentTarget as HTMLButtonElement).style.borderColor = C.panelBorder; }}
+                      >
+                        Logout
+                      </button>
+                      <button
+                          onClick={() => navigate({ name: "mypage" })}
+                          className="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 uppercase tracking-wider transition-all"
+                          style={{
+                            border: `1px solid ${view.name === "mypage" ? C.red : C.panelBorder}`,
+                            color: view.name === "mypage" ? C.text : C.textDim,
+                            fontFamily: "Share Tech Mono",
+                          }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text; (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; }}
+                          onMouseLeave={(e) => {
+                            const on = view.name === "mypage";
+                            (e.currentTarget as HTMLButtonElement).style.color = on ? C.text : C.textDim;
+                            (e.currentTarget as HTMLButtonElement).style.borderColor = on ? C.red : C.panelBorder;
+                          }}
+                      >
+                        마이페이지
+                      </button>
+                      {userTier === "green" && (
+                          <button
+                              onClick={() => navigate({ name: "admin" })}
+                              className="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 uppercase tracking-wider transition-all"
+                              style={{
+                                border: `1px solid ${view.name === "admin" ? "#10b981" : C.panelBorder}`,
+                                color: view.name === "admin" ? "#34d399" : C.textDim,
+                                fontFamily: "Share Tech Mono",
+                              }}
+                          >
+                            관리자 페이지
+                          </button>
+                      )}
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setShowLogin(true)}
+                        className="text-xs font-bold px-4 py-1.5 uppercase tracking-wider transition-all"
+                        style={{ background: C.red, color: "#fff", fontFamily: "Share Tech Mono" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.redBright; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.red; }}
+                    >
+                      Login
+                    </button>
+                )}
+
+                {/* mobile menu */}
+                <button className="md:hidden" style={{ color: C.textDim }} onClick={() => setMenuOpen(!menuOpen)}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {menuOpen && (
-          <div style={{ background: "rgba(12,0,0,0.98)", borderTop: `1px solid ${C.panelBorder}` }}>
-            {/* 모바일에서는 헤더에 검색창이 없으므로 메뉴 맨 위에 둔다. Enter 를 누르면 메뉴를 닫고 결과 목록으로 간다 */}
-            <div className="flex items-center gap-2 px-6 py-3" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
-              <button type="button" onClick={() => submitSearch()} aria-label="검색">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-                </svg>
-              </button>
-              <input
-                value={searchInput}
-                onChange={(e) => handleSearchInputChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  submitSearch();
-                }}
-                placeholder="검색..."
-                className="flex-1 bg-transparent outline-none text-sm"
-                style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}
-              />
-            </div>
-            {NAV_ITEMS.map((item) => (
-              <button key={item} onClick={() => changeNav(item)}
-                className="block w-full text-left px-6 py-3 text-sm uppercase tracking-widest"
-                style={{ fontFamily: "Cinzel, serif", color: activeNav === item ? C.redBright : C.textDim, borderBottom: `1px solid ${C.panelBorder}` }}>
-                {item}
-              </button>
-            ))}
-          </div>
-        )}
-      </header>
+          {menuOpen && (
+              <div style={{ background: "rgba(12,0,0,0.98)", borderTop: `1px solid ${C.panelBorder}` }}>
+                {/* 모바일에서는 헤더에 검색창이 없으므로 메뉴 맨 위에 둔다. Enter 를 누르면 메뉴를 닫고 결과 목록으로 간다 */}
+                <div className="flex items-center gap-2 px-6 py-3" style={{ borderBottom: `1px solid ${C.panelBorder}` }}>
+                  <button type="button" onClick={() => submitSearch()} aria-label="검색">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                    </svg>
+                  </button>
+                  <input
+                      value={searchInput}
+                      onChange={(e) => handleSearchInputChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        submitSearch();
+                      }}
+                      placeholder="검색..."
+                      className="flex-1 bg-transparent outline-none text-sm"
+                      style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}
+                  />
+                </div>
+                {NAV_ITEMS.map((item) => (
+                    <button key={item} onClick={() => changeNav(item)}
+                            className="block w-full text-left px-6 py-3 text-sm uppercase tracking-widest"
+                            style={{ fontFamily: "Cinzel, serif", color: activeNav === item ? C.redBright : C.textDim, borderBottom: `1px solid ${C.panelBorder}` }}>
+                      {item}
+                    </button>
+                ))}
+              </div>
+          )}
+        </header>
 
-      {/* 로그인 전에는 상품을 일절 보여주지 않는다 */}
-      {!session && <Gate onLogin={() => setShowLogin(true)} />}
+        {/* 로그인 전에는 상품을 일절 보여주지 않는다 */}
+        {!session && <Gate onLogin={() => setShowLogin(true)} />}
 
-      {/* 새로고침 직후 토큰을 다시 받아 오는 동안 */}
-      {session && !authReady && (
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
-          <div
-            className="flex items-center justify-center gap-3 py-20"
-            style={{ background: C.panel, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
-          >
-            <Spinner color={C.redBright} />
-            <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+        {/* 새로고침 직후 토큰을 다시 받아 오는 동안 */}
+        {session && !authReady && (
+            <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
+              <div
+                  className="flex items-center justify-center gap-3 py-20"
+                  style={{ background: C.panel, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
+              >
+                <Spinner color={C.redBright} />
+                <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
               로그인 정보를 확인하는 중...
             </span>
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
+        )}
 
-      {session && authReady && onListPage && (
-        <>
-          {/* ── CODE TABS ──────────────────────────────── */}
-          <div className="flex" style={{ background: "rgba(0,0,0,0.55)", borderBottom: `1px solid ${C.panelBorder}` }}>
-            {(["red", "purple", "yellow"] as Tier[]).map((tier) => (
-              <CodeTab
-                key={tier}
-                tier={tier}
-                active={activeCodeTab === tier}
-                userTier={userTier}
-                onClick={() => setActiveCodeTab(tier)}
-              />
-            ))}
-          </div>
+        {session && authReady && onListPage && (
+            <>
+              {/* ── CODE TABS ──────────────────────────────── */}
+              <div className="flex" style={{ background: "rgba(0,0,0,0.55)", borderBottom: `1px solid ${C.panelBorder}` }}>
+                {(["red", "purple", "yellow"] as Tier[]).map((tier) => (
+                    <CodeTab
+                        key={tier}
+                        tier={tier}
+                        active={activeCodeTab === tier}
+                        userTier={userTier}
+                        onClick={() => setActiveCodeTab(tier)}
+                    />
+                ))}
+              </div>
 
-          {/* ── TIER INFO BANNER ────────────────────────── */}
-          {session && userTier && (
-            <div
-              className="py-2.5 px-6 flex items-center gap-4 flex-wrap"
-              style={{
-                background: `${TIERS[userTier].color}18`,
-                borderBottom: `1px solid ${TIERS[userTier].color}44`,
-              }}
-            >
-              <TierBadge tier={userTier} />
-              <span className="text-xs" style={{ color: C.textDim, fontFamily: "Share Tech Mono" }}>
+              {/* ── TIER INFO BANNER ────────────────────────── */}
+              {session && userTier && (
+                  <div
+                      className="py-2.5 px-6 flex items-center gap-4 flex-wrap"
+                      style={{
+                        background: `${TIERS[userTier].color}18`,
+                        borderBottom: `1px solid ${TIERS[userTier].color}44`,
+                      }}
+                  >
+                    <TierBadge tier={userTier} />
+                    <span className="text-xs" style={{ color: C.textDim, fontFamily: "Share Tech Mono" }}>
                 {TIERS[userTier].desc}
               </span>
-              <div className="flex-1" style={{ minWidth: 220, maxWidth: 420 }}>
-                <TierProgress spent={session.spent} />
-              </div>
-            </div>
-          )}
+                    <div className="flex-1" style={{ minWidth: 220, maxWidth: 420 }}>
+                      <TierProgress spent={session.spent} />
+                    </div>
+                  </div>
+              )}
 
-          {/* ── HERO ────────────────────────────────────── */}
-          <div className="relative overflow-hidden" style={{ minHeight: 180 }}>
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(https://images.unsplash.com/photo-1687349150019-003d3ea38d79?w=1400&h=250&fit=crop&auto=format)`,
-                backgroundSize: "cover",
-                backgroundPosition: "center 30%",
-                filter: "brightness(0.18) saturate(0.3)",
-              }}
-            />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(15,0,0,0.95) 0%, transparent 50%, rgba(15,0,0,0.95) 100%)" }} />
-            <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-10">
-              <div
-                className="inline-flex items-center gap-2 px-3 py-1.5 mb-4"
-                style={{
-                  color: TIERS[activeCodeTab].brightColor,
-                  background: `${TIERS[activeCodeTab].color}20`,
-                  border: `1px solid ${TIERS[activeCodeTab].color}66`,
-                  fontFamily: "Share Tech Mono",
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: TIERS[activeCodeTab].brightColor, boxShadow: `0 0 8px ${TIERS[activeCodeTab].brightColor}` }}
+              {/* ── HERO ────────────────────────────────────── */}
+              <div className="relative overflow-hidden" style={{ minHeight: 180 }}>
+                <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: `url(https://images.unsplash.com/photo-1687349150019-003d3ea38d79?w=1400&h=250&fit=crop&auto=format)`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center 30%",
+                      filter: "brightness(0.18) saturate(0.3)",
+                    }}
                 />
-                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(15,0,0,0.95) 0%, transparent 50%, rgba(15,0,0,0.95) 100%)" }} />
+                <div className="relative max-w-[1280px] mx-auto px-4 md:px-8 py-10">
+                  <div
+                      className="inline-flex items-center gap-2 px-3 py-1.5 mb-4"
+                      style={{
+                        color: TIERS[activeCodeTab].brightColor,
+                        background: `${TIERS[activeCodeTab].color}20`,
+                        border: `1px solid ${TIERS[activeCodeTab].color}66`,
+                        fontFamily: "Share Tech Mono",
+                      }}
+                  >
+                <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: TIERS[activeCodeTab].brightColor, boxShadow: `0 0 8px ${TIERS[activeCodeTab].brightColor}` }}
+                />
+                    <span className="text-[11px] font-bold uppercase tracking-[0.2em]">
                   {TIERS[activeCodeTab].label}
                 </span>
-              </div>
-              <h1
-                className="font-bold uppercase leading-none mb-2"
-                style={{
-                  fontFamily: "Cinzel, serif",
-                  fontSize: "clamp(22px,4vw,48px)",
-                  color: C.text,
-                  textShadow: `0 0 30px ${TIERS[activeCodeTab].color}55`,
-                }}
-              >
-                {activeCodeTab === "red" && "VIP PREMIUM COLLECTION"}
-                {activeCodeTab === "purple" && "MID-TIER TACTICAL GEAR"}
-                {activeCodeTab === "yellow" && "ENTRY GRADE ARSENAL"}
-              </h1>
-              <p className="text-sm mb-1" style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}>
-                {TIERS[activeCodeTab].desc}
-              </p>
-              <p className="text-xs" style={{ color: C.textMuted, fontFamily: "Noto Sans KR" }}>
-                {activeNav}{activeSub !== "전체" ? ` / ${activeSub}` : ""} · 총 {listTotal.toLocaleString("ko-KR")}개 상품
-              </p>
-            </div>
-          </div>
-
-          {/* ── MAIN ────────────────────────────────────── */}
-          <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6">
-            <div className="flex gap-0" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
-              <Sidebar category={activeNav} activeSub={activeSub} onSub={setActiveSub} />
-
-              <div className="flex-1 p-5">
-                {/* mobile subcats */}
-                <div className="flex md:hidden gap-2 flex-wrap mb-4">
-                  {(SUBCATS[activeNav] ?? []).map((s) => (
-                    <button key={s} onClick={() => setActiveSub(s)}
-                      className="text-[10px] uppercase tracking-widest px-2.5 py-1 transition-all"
+                  </div>
+                  <h1
+                      className="font-bold uppercase leading-none mb-2"
                       style={{
-                        fontFamily: "Share Tech Mono",
-                        background: activeSub === s ? C.red : "rgba(0,0,0,0.5)",
-                        color: activeSub === s ? "#fff" : C.textMuted,
-                        border: `1px solid ${activeSub === s ? C.red : C.panelBorder}`,
+                        fontFamily: "Cinzel, serif",
+                        fontSize: "clamp(22px,4vw,48px)",
+                        color: C.text,
+                        textShadow: `0 0 30px ${TIERS[activeCodeTab].color}55`,
                       }}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  >
+                    {activeCodeTab === "red" && "VIP PREMIUM COLLECTION"}
+                    {activeCodeTab === "purple" && "MID-TIER TACTICAL GEAR"}
+                    {activeCodeTab === "yellow" && "ENTRY GRADE ARSENAL"}
+                  </h1>
+                  <p className="text-sm mb-1" style={{ color: C.textDim, fontFamily: "Noto Sans KR" }}>
+                    {TIERS[activeCodeTab].desc}
+                  </p>
+                  <p className="text-xs" style={{ color: C.textMuted, fontFamily: "Noto Sans KR" }}>
+                    {activeNav}{activeSub !== "전체" ? ` / ${activeSub}` : ""} · 총 {listTotal.toLocaleString("ko-KR")}개 상품
+                  </p>
                 </div>
+              </div>
 
-                {/* sort row */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
+              {/* ── MAIN ────────────────────────────────────── */}
+              <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-6">
+                <div className="flex gap-0" style={{ background: C.panel, border: `1px solid ${C.panelBorder}` }}>
+                  <Sidebar category={activeNav} activeSub={activeSub} onSub={changeSubCategory} />
+
+                  <div className="flex-1 p-5">
+                    {/* mobile subcats */}
+                    <div className="flex md:hidden gap-2 flex-wrap mb-4">
+                      {(SUBCATS[activeNav] ?? []).map((s) => (
+                          <button key={s} onClick={() => changeSubCategory(s)}
+                                  className="text-[10px] uppercase tracking-widest px-2.5 py-1 transition-all"
+                                  style={{
+                                    fontFamily: "Share Tech Mono",
+                                    background: activeSub === s ? C.red : "rgba(0,0,0,0.5)",
+                                    color: activeSub === s ? "#fff" : C.textMuted,
+                                    border: `1px solid ${activeSub === s ? C.red : C.panelBorder}`,
+                                  }}
+                          >
+                            {s}
+                          </button>
+                      ))}
+                    </div>
+
+                    {/* sort row */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
                     <span className="text-xs uppercase tracking-widest" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
                       {isSearching ? `검색: ${searchKeyword}` : activeSub === "전체" ? activeNav : activeSub}
                     </span>
-                    <TierBadge tier={activeCodeTab} small />
-                    <span
-                      className="text-xs px-1.5 py-0.5"
-                      style={{ background: "rgba(200,30,0,0.12)", color: C.red, fontFamily: "Share Tech Mono", border: `1px solid ${C.redDim}` }}
-                    >
+                        <TierBadge tier={activeCodeTab} small />
+                        <span
+                            className="text-xs px-1.5 py-0.5"
+                            style={{ background: "rgba(200,30,0,0.12)", color: C.red, fontFamily: "Share Tech Mono", border: `1px solid ${C.redDim}` }}
+                        >
                       {listTotal}
                     </span>
-                    {listLoading && <Spinner color={C.textMuted} />}
-                  </div>
-                  <select
-                    value={sortKey}
-                    onChange={(e) => setSortKey(e.target.value as ApiProductSort)}
-                    className="text-[10px] uppercase tracking-wider px-2 py-1 outline-none"
-                    style={{ background: "rgba(0,0,0,0.5)", color: C.textMuted, border: `1px solid ${C.panelBorder}`, fontFamily: "Share Tech Mono" }}
-                  >
-                    <option value="POPULAR">POPULAR</option>
-                    <option value="PRICE_ASC">PRICE ↑</option>
-                    <option value="PRICE_DESC">PRICE ↓</option>
-                    <option value="NEWEST">NEWEST</option>
-                  </select>
-                </div>
+                        {listLoading && <Spinner color={C.textMuted} />}
+                      </div>
+                      <select
+                          value={sortKey}
+                          onChange={(e) => setSortKey(e.target.value as ApiProductSort)}
+                          className="text-[10px] uppercase tracking-wider px-2 py-1 outline-none"
+                          style={{ background: "rgba(0,0,0,0.5)", color: C.textMuted, border: `1px solid ${C.panelBorder}`, fontFamily: "Share Tech Mono" }}
+                      >
+                        <option value="POPULAR">POPULAR</option>
+                        <option value="PRICE_ASC">PRICE ↑</option>
+                        <option value="PRICE_DESC">PRICE ↓</option>
+                        <option value="NEWEST">NEWEST</option>
+                      </select>
+                    </div>
 
-                {/* grid */}
-                {listError ? (
-                  <div className="flex flex-col items-center justify-center py-16" style={{ border: `1px dashed ${C.panelBorder}` }}>
-                    <div className="text-3xl font-bold uppercase mb-2" style={{ fontFamily: "Cinzel, serif", color: C.redDim }}>
-                      LOAD FAILED
-                    </div>
-                    <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-                      // 상품을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-                    </div>
-                  </div>
-                ) : listItems.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {listItems.map((p) => (
-                      <ProductCard
-                        key={p.id}
-                        p={p}
-                        onOpen={() => navigate({ name: "detail", id: String(p.productId) })}
-                      />
-                    ))}
-                  </div>
-                ) : !listLoading ? (
-                  <div className="flex flex-col items-center justify-center py-16" style={{ border: `1px dashed ${C.panelBorder}` }}>
-                    <div className="text-3xl font-bold uppercase mb-2" style={{ fontFamily: "Cinzel, serif", color: C.redDim }}>
-                      NO ITEMS
-                    </div>
-                    <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
-                      // {isSearching ? `"${searchKeyword}"` : activeSub} — {TIERS[activeCodeTab].label} 등급 아이템 없음
-                    </div>
-                  </div>
-                ) : null}
+                    {/* grid */}
+                    {listError ? (
+                        <div className="flex flex-col items-center justify-center py-16" style={{ border: `1px dashed ${C.panelBorder}` }}>
+                          <div className="text-3xl font-bold uppercase mb-2" style={{ fontFamily: "Cinzel, serif", color: C.redDim }}>
+                            LOAD FAILED
+                          </div>
+                          <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Share Tech Mono" }}>
+                            상품을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+                          </div>
+                        </div>
+                    ) : listItems.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {listItems.map((p) => (
+                              <ProductCard
+                                  key={p.id}
+                                  p={p}
+                                  onOpen={() => navigate({ name: "detail", id: String(p.productId) })}
+                              />
+                          ))}
+                        </div>
+                    ) : !listLoading ? (
+                        <div className="flex flex-col items-center justify-center py-16" style={{ border: `1px dashed ${C.panelBorder}` }}>
+                          <div className="text-3xl font-bold uppercase mb-2" style={{ fontFamily: "Cinzel, serif", color: C.redDim }}>
+                            NO ITEMS
+                          </div>
+                          <div className="text-xs" style={{ color: C.textMuted, fontFamily: "Noto Sans KR, sans-serif" }}>
+                            {isSearching
+                                ? `“${searchKeyword}”에 해당하는 상품이 없습니다.`
+                                : activeSub === "전체"
+                                    ? "현재 등록된 상품이 없습니다."
+                                    : `${activeSub} 카테고리에 ${TIERS[activeCodeTab].label} 등급 상품이 없습니다.`}
+                          </div>
+                        </div>
+                    ) : null}
 
-                {listHasNext && (
-                  <div className="text-center mt-8">
-                    <button
-                      onClick={loadMoreProducts}
-                      disabled={listLoading}
-                      className="px-10 py-2.5 text-xs font-bold uppercase tracking-widest transition-all"
-                      style={{ border: `1px solid ${C.panelBorder}`, color: C.textDim, fontFamily: "Share Tech Mono", cursor: listLoading ? "wait" : "pointer" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.panelBorder; (e.currentTarget as HTMLButtonElement).style.color = C.textDim; }}
-                    >
-                      {listLoading ? "불러오는 중…" : "더 보기 →"}
-                    </button>
-                    {listMoreError && (
-                      <p className="text-xs mt-3" style={{ color: C.redBright, fontFamily: "Noto Sans KR, sans-serif" }}>
-                        상품을 더 불러오지 못했습니다. 다시 시도해 주세요.
-                      </p>
+                    {listHasNext && (
+                        <div className="text-center mt-8">
+                          <button
+                              onClick={loadMoreProducts}
+                              disabled={listLoading}
+                              className="px-10 py-2.5 text-xs font-bold uppercase tracking-widest transition-all"
+                              style={{ border: `1px solid ${C.panelBorder}`, color: C.textDim, fontFamily: "Share Tech Mono", cursor: listLoading ? "wait" : "pointer" }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.red; (e.currentTarget as HTMLButtonElement).style.color = C.text; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.panelBorder; (e.currentTarget as HTMLButtonElement).style.color = C.textDim; }}
+                          >
+                            {listLoading ? "불러오는 중…" : "더 보기 →"}
+                          </button>
+                          {listMoreError && (
+                              <p className="text-xs mt-3" style={{ color: C.redBright, fontFamily: "Noto Sans KR, sans-serif" }}>
+                                상품을 더 불러오지 못했습니다. 다시 시도해 주세요.
+                              </p>
+                          )}
+                        </div>
                     )}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-          </div>
-        </>
-      )}
+            </>
+        )}
 
-      {session && view.name === "detail" && detailLoading && (
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
-          <div
-            className="flex items-center justify-center gap-3 py-20"
-            style={{ background: C.panel, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
-          >
-            <Spinner color={C.redBright} />
-            <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+        {session && view.name === "detail" && detailLoading && (
+            <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
+              <div
+                  className="flex items-center justify-center gap-3 py-20"
+                  style={{ background: C.panel, border: `1px solid ${C.panelBorder}`, color: C.textDim }}
+              >
+                <Spinner color={C.redBright} />
+                <span className="text-xs" style={{ fontFamily: "Share Tech Mono" }}>
               상품 상세정보를 불러오는 중...
             </span>
           </div>
         </div>
       )}
+
 
       {session && view.name === "detail" && !detailLoading && detailError && (
         <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-20">
@@ -1235,7 +1285,16 @@ export default function App() {
       )}
 
       {session && authReady && view.name === "mypage" && (
-        <MyPage onBack={() => navigate({ name: "list" })} />
+        <MyPage
+          key={view.orderId ?? "default"}
+          onBack={() => navigate({ name: "list" })}
+          initialSection={view.section}
+          initialOrderId={view.orderId}
+        />
+      )}
+
+      {session && authReady && userTier === "green" && view.name === "admin" && (
+        <ProductRankingAdmin onBack={() => navigate({ name: "list" })} />
       )}
 
       {session && authReady && view.name === "cart" && (
@@ -1271,48 +1330,61 @@ export default function App() {
 
       {/* ── FOOTER ──────────────────────────────────── */}
       <footer className="mt-6 border-t" style={{ borderColor: C.panelBorder, background: "rgba(0,0,0,0.7)" }}>
-        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            {[
-              { h: "SHOP", links: ["Guns", "Weapons", "Bombs", "Gear", "Ammo"] },
-              { h: "SUPPORT", links: ["주문 조회", "반품/교환", "보증", "고객센터", "FAQ"] },
-              { h: "MEMBERSHIP", links: ["Code Red", "Code Purple", "Code Yellow", "등급 안내", "혜택 비교"] },
-              { h: "COMPANY", links: ["About", "Blog", "Careers", "Legal"] },
-            ].map((col) => (
-              <div key={col.h}>
-                <div className="text-[10px] uppercase tracking-[0.2em] mb-3 font-semibold"
-                  style={{ color: C.red, fontFamily: "Share Tech Mono" }}>
-                  {col.h}
-                </div>
-                <ul className="space-y-1.5">
-                  {col.links.map((l) => (
-                    <li key={l}>
-                      <a href="#" className="text-xs transition-colors"
-                        style={{ color: C.textMuted, fontFamily: "Noto Sans KR" }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.text; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = C.textMuted; }}>
-                        {l}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          <div
-            className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pt-6 border-t text-[10px]"
-            style={{ borderColor: C.panelBorder, color: C.textMuted, fontFamily: "Share Tech Mono" }}
-          >
-            <span>
-              <span style={{ color: C.text, fontFamily: "Cinzel, serif", fontSize: 13 }}>MurderHelp</span>
-              {" "}© 2026 All rights reserved.
+        <div
+          className="w-full py-1.5 text-center text-[10px] uppercase tracking-[0.3em] border-b opacity-40"
+          style={{
+            color: C.yellowBright,
+            fontFamily: "Share Tech Mono",
+            borderColor: C.panelBorder,
+            background:
+              "repeating-linear-gradient(45deg, rgba(232,48,16,0.12) 0 10px, rgba(0,0,0,0.35) 10px 20px)",
+          }}
+        >
+          ⚠️ TOY PROJECT AREA - DO NOT CROSS ⚠️
+        </div>
+
+        <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-10 flex flex-col items-center text-center">
+          <div>
+            <span style={{ fontFamily: "Cinzel, serif" }} className="text-sm font-medium text-neutral-400">
+              MURDERHELP
             </span>
-            <div className="flex items-center gap-3">
-              <span>BB탄 전용 · 만 18세 이상</span>
-              <span className="px-2 py-0.5" style={{ border: `1px solid ${C.panelBorder}`, color: C.red }}>
-                AIRSOFT ONLY
-              </span>
-            </div>
+            <span style={{ fontFamily: "Share Tech Mono" }} className="text-xs text-neutral-500 ml-2">
+              | Murder Mystery Assistant &amp; Toolkit
+            </span>
+          </div>
+
+          <p
+            className="text-xs italic mt-2 text-neutral-500"
+            style={{ fontFamily: "Noto Sans KR" }}
+          >
+            "모든 트릭에는 빈틈이 있고, 모든 코드에는 버그가 있다."
+          </p>
+
+          <div className="flex items-center gap-3 mt-4 text-xs" style={{ fontFamily: "Share Tech Mono" }}>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/tree/main"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              도구 열람 (GitHub)
+            </a>
+            <span className="text-neutral-600">·</span>
+            <a
+              href="https://github.com/team-4-ladder/Murder-Help/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neutral-400 hover:underline"
+            >
+              결함 제보 (Report Bug)
+            </a>
+          </div>
+
+          <div
+            className="w-full pt-6 mt-8 border-t text-[11px] text-neutral-600"
+            style={{ borderColor: C.panelBorder, fontFamily: "Share Tech Mono" }}
+          >
+            © 2026 murderhelp.dev. Crafted for mystery lovers. · 현실의 긴급 상황은 112로 신고해 주세요.
           </div>
         </div>
       </footer>

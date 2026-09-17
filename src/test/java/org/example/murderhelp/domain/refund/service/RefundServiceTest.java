@@ -1,6 +1,7 @@
 package org.example.murderhelp.domain.refund.service;
 
 import org.example.murderhelp.domain.member.entity.Member;
+import org.example.murderhelp.domain.member.service.MemberSpendingService;
 import org.example.murderhelp.domain.order.entity.Order;
 import org.example.murderhelp.domain.order.entity.OrderItem;
 import org.example.murderhelp.domain.order.entity.OrderStatus;
@@ -38,15 +39,24 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-/**
- * RefundService.calculateAndSaveRefund() 의 검증 로직과, 과거 실제로 있었던
- * "RefundItem 이 연관관계만 세팅되고 저장되지 않던 버그"에 대한 회귀 테스트를 포함한다.
- */
 @ExtendWith(MockitoExtension.class)
 class RefundServiceTest {
+
+    private static final Long MEMBER_ID = 1L;
+    private static final Long PAYMENT_ID = 200L;
+    private static final Long ORDER_ITEM_ID = 10L;
+    private static final Long PRODUCT_ID = 50L;
 
     @Mock
     private PaymentService paymentService;
@@ -63,13 +73,11 @@ class RefundServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private MemberSpendingService memberSpendingService;
+
     @InjectMocks
     private RefundService refundService;
-
-    private static final Long MEMBER_ID = 1L;
-    private static final Long PAYMENT_ID = 200L;
-    private static final Long ORDER_ITEM_ID = 10L;
-    private static final Long PRODUCT_ID = 50L;
 
     private Member member;
     private Order order;
@@ -80,34 +88,94 @@ class RefundServiceTest {
     @BeforeEach
     void setUp() {
         member = mock(Member.class);
-        lenient().when(member.getId()).thenReturn(MEMBER_ID);
+
+        lenient()
+                .when(member.getId())
+                .thenReturn(MEMBER_ID);
 
         order = mock(Order.class);
-        lenient().when(order.getMember()).thenReturn(member);
+
+        lenient()
+                .when(order.getMember())
+                .thenReturn(member);
+
+        lenient().when(order.getStatus())
+                .thenReturn(OrderStatus.PAID);
 
         payment = mock(Payment.class);
-        lenient().when(payment.getId()).thenReturn(PAYMENT_ID);
-        lenient().when(payment.getOrder()).thenReturn(order);
-        lenient().when(payment.getPgAmount()).thenReturn(27_000L);
+
+        lenient()
+                .when(payment.getId())
+                .thenReturn(PAYMENT_ID);
+
+        lenient()
+                .when(payment.getOrder())
+                .thenReturn(order);
+
+        lenient()
+                .when(payment.getPgAmount())
+                .thenReturn(27_000L);
 
         product = mock(Product.class);
-        lenient().when(product.getId()).thenReturn(PRODUCT_ID);
+
+        lenient()
+                .when(product.getId())
+                .thenReturn(PRODUCT_ID);
 
         orderItem = mock(OrderItem.class);
-        lenient().when(orderItem.getId()).thenReturn(ORDER_ITEM_ID);
-        lenient().when(orderItem.getQuantity()).thenReturn(2);
-        lenient().when(orderItem.getProduct()).thenReturn(product);
+
+        lenient()
+                .when(orderItem.getId())
+                .thenReturn(ORDER_ITEM_ID);
+
+        lenient()
+                .when(orderItem.getQuantity())
+                .thenReturn(2);
+
+        lenient()
+                .when(orderItem.getProduct())
+                .thenReturn(product);
     }
 
     private RefundRequest requestFor(int quantity) {
-        return new RefundRequest(PAYMENT_ID, "단순 변심", List.of(new RefundItemRequest(ORDER_ITEM_ID, quantity)));
+        return new RefundRequest(
+                PAYMENT_ID,
+                "단순 변심",
+                List.of(
+                        new RefundItemRequest(
+                                ORDER_ITEM_ID,
+                                quantity
+                        )
+                )
+        );
     }
 
-    private void stubBaseFlow(List<RefundWithItems> existingRefunds, RefundCalculationResult calcResult) {
-        PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-        when(paymentService.findForRefund(PAYMENT_ID)).thenReturn(paymentWithItems);
-        when(refundRepository.findByPaymentIdWithItems(PAYMENT_ID)).thenReturn(existingRefunds);
-        lenient().when(refundCalculator.calculate(any(), anyMap(), eq(payment), anyBoolean(), anyLong()))
+    private void stubBaseFlow(
+            List<RefundWithItems> existingRefunds,
+            RefundCalculationResult calcResult
+    ) {
+        PaymentWithItems paymentWithItems =
+                new PaymentWithItems(
+                        payment,
+                        List.of(orderItem)
+                );
+
+        when(paymentService.findForRefund(PAYMENT_ID))
+                .thenReturn(paymentWithItems);
+
+        when(refundRepository.findByPaymentIdWithItems(PAYMENT_ID))
+                .thenReturn(existingRefunds);
+
+        lenient()
+                .when(
+                        refundCalculator.calculate(
+                                any(),
+                                anyMap(),
+                                eq(payment),
+                                anyBoolean(),
+                                anyLong()
+                        )
+                )
                 .thenReturn(calcResult);
     }
 
@@ -118,100 +186,266 @@ class RefundServiceTest {
         @Test
         @DisplayName("5초 이내 동일 결제건 환불 이력이 있으면 중복 요청 예외를 던진다")
         void rejectsDuplicateRequestWithinFiveSeconds() {
+            // given
             Refund recentRefund = mock(Refund.class);
-            when(recentRefund.getCreatedAt()).thenReturn(LocalDateTime.now().minusSeconds(2));
-            RefundWithItems duplicate = new RefundWithItems(recentRefund, List.of());
 
-            stubBaseFlow(List.of(duplicate), null);
+            when(recentRefund.getCreatedAt())
+                    .thenReturn(
+                            LocalDateTime.now()
+                                    .minusSeconds(2)
+                    );
 
-            assertThatThrownBy(() -> refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(1)))
+            RefundWithItems duplicate =
+                    new RefundWithItems(
+                            recentRefund,
+                            List.of()
+                    );
+
+            stubBaseFlow(
+                    List.of(duplicate),
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.calculateAndSaveRefund(
+                            MEMBER_ID,
+                            requestFor(1)
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.DUPLICATE_REFUND_REQUEST);
+                    .isEqualTo(
+                            ErrorCode.DUPLICATE_REFUND_REQUEST
+                    );
 
-            verify(refundRepository, never()).save(any());
+            verify(refundRepository, never())
+                    .save(any());
+
+            verify(memberSpendingService, never())
+                    .subtractRefundAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
 
         @Test
         @DisplayName("5초가 지난 이전 환불 이력은 중복으로 보지 않는다")
         void doesNotTreatOldRefundAsDuplicate() {
+            // given
             Refund oldRefund = mock(Refund.class);
-            when(oldRefund.getCreatedAt()).thenReturn(LocalDateTime.now().minusMinutes(10));
-            when(oldRefund.getStatus()).thenReturn(RefundStatus.COMPLETED);
-            when(oldRefund.getPgRefundAmount()).thenReturn(9_000L);
-            RefundWithItems oldOne = new RefundWithItems(oldRefund, List.of());
 
-            RefundItem newRefundItem = mock(RefundItem.class);
-            RefundCalculationResult calcResult = new RefundCalculationResult(List.of(newRefundItem), 9_000L);
-            stubBaseFlow(List.of(oldOne), calcResult);
+            when(oldRefund.getCreatedAt())
+                    .thenReturn(
+                            LocalDateTime.now()
+                                    .minusMinutes(10)
+                    );
 
-            when(refundRepository.save(any(Refund.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(oldRefund.getStatus())
+                    .thenReturn(RefundStatus.COMPLETED);
 
-            // 남은 수량이 1개(전체 2개 중 1개는 이전 이력에 이미 반영됐다고 가정하지 않고,
-            // 여기서는 요청 수량이 남은 수량 이내인 정상 케이스만 확인
-            refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(1));
+            when(oldRefund.getPgRefundAmount())
+                    .thenReturn(9_000L);
 
-            verify(refundRepository).save(any(Refund.class));
+            RefundWithItems oldOne =
+                    new RefundWithItems(
+                            oldRefund,
+                            List.of()
+                    );
+
+            RefundItem newRefundItem =
+                    mock(RefundItem.class);
+
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(newRefundItem),
+                            9_000L
+                    );
+
+            stubBaseFlow(
+                    List.of(oldOne),
+                    calcResult
+            );
+
+            when(refundRepository.save(any(Refund.class)))
+                    .thenAnswer(
+                            invocation ->
+                                    invocation.getArgument(0)
+                    );
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(1)
+            );
+
+            // then
+            verify(refundRepository)
+                    .save(any(Refund.class));
+
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            9_000L
+                    );
         }
 
         @Test
         @DisplayName("본인 소유가 아닌 결제 건이면 접근 거부 예외를 던진다")
         void rejectsWhenNotOwner() {
-            stubBaseFlow(List.of(), null);
+            // given
+            stubBaseFlow(
+                    List.of(),
+                    null
+            );
 
-            assertThatThrownBy(() -> refundService.calculateAndSaveRefund(999L, requestFor(1)))
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.calculateAndSaveRefund(
+                            999L,
+                            requestFor(1)
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.REFUND_ACCESS_DENIED);
+                    .isEqualTo(
+                            ErrorCode.REFUND_ACCESS_DENIED
+                    );
+
+            verify(memberSpendingService, never())
+                    .subtractRefundAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
 
         @Test
         @DisplayName("존재하지 않는 주문상품 ID로 요청하면 예외를 던진다")
         void rejectsUnknownOrderItemId() {
-            stubBaseFlow(List.of(), null);
+            // given
+            stubBaseFlow(
+                    List.of(),
+                    null
+            );
 
-            RefundRequest request = new RefundRequest(
-                    PAYMENT_ID, "단순 변심", List.of(new RefundItemRequest(9999L, 1)));
+            RefundRequest request =
+                    new RefundRequest(
+                            PAYMENT_ID,
+                            "단순 변심",
+                            List.of(
+                                    new RefundItemRequest(
+                                            9999L,
+                                            1
+                                    )
+                            )
+                    );
 
-            assertThatThrownBy(() -> refundService.calculateAndSaveRefund(MEMBER_ID, request))
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.calculateAndSaveRefund(
+                            MEMBER_ID,
+                            request
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.REFUND_ITEM_NOT_FOUND);
+                    .isEqualTo(
+                            ErrorCode.REFUND_ITEM_NOT_FOUND
+                    );
+
+            verify(memberSpendingService, never())
+                    .subtractRefundAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
 
         @Test
         @DisplayName("남은 수량보다 많이 환불 요청하면 예외를 던진다")
         void rejectsWhenExceedingRemainingQuantity() {
-            // orderItem 의 원래 수량은 2개, 3개를 요청하면 초과
-            stubBaseFlow(List.of(), null);
+            // given
+            stubBaseFlow(
+                    List.of(),
+                    null
+            );
 
-            assertThatThrownBy(() -> refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(3)))
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.calculateAndSaveRefund(
+                            MEMBER_ID,
+                            requestFor(3)
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
+                    .isEqualTo(
+                            ErrorCode.EXCEED_REFUNDABLE_QUANTITY
+                    );
 
-            verify(refundRepository, never()).save(any());
+            verify(refundRepository, never())
+                    .save(any());
+
+            verify(memberSpendingService, never())
+                    .subtractRefundAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
 
         @Test
         @DisplayName("이미 환불된 수량을 제외한 남은 수량만큼만 요청 가능하다")
         void accountsForAlreadyRefundedQuantity() {
-            RefundItem previouslyRefundedItem = mock(RefundItem.class);
-            when(previouslyRefundedItem.getOrderItem()).thenReturn(orderItem);
-            when(previouslyRefundedItem.getRefundQuantity()).thenReturn(1);
+            // given
+            RefundItem previouslyRefundedItem =
+                    mock(RefundItem.class);
 
-            Refund completedRefund = mock(Refund.class);
-            when(completedRefund.getCreatedAt()).thenReturn(LocalDateTime.now().minusMinutes(10));
-            when(completedRefund.getStatus()).thenReturn(RefundStatus.COMPLETED);
-            RefundWithItems existing = new RefundWithItems(completedRefund, List.of(previouslyRefundedItem));
+            when(previouslyRefundedItem.getOrderItem())
+                    .thenReturn(orderItem);
 
-            stubBaseFlow(List.of(existing), null);
+            when(previouslyRefundedItem.getRefundQuantity())
+                    .thenReturn(1);
 
-            // 원래 수량 2개 중 1개는 이미 환불됨 -> 남은 건 1개인데 2개를 요청하면 초과
-            assertThatThrownBy(() -> refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(2)))
+            Refund completedRefund =
+                    mock(Refund.class);
+
+            when(completedRefund.getCreatedAt())
+                    .thenReturn(
+                            LocalDateTime.now()
+                                    .minusMinutes(10)
+                    );
+
+            when(completedRefund.getStatus())
+                    .thenReturn(RefundStatus.COMPLETED);
+
+            RefundWithItems existing =
+                    new RefundWithItems(
+                            completedRefund,
+                            List.of(previouslyRefundedItem)
+                    );
+
+            stubBaseFlow(
+                    List.of(existing),
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.calculateAndSaveRefund(
+                            MEMBER_ID,
+                            requestFor(2)
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
+                    .isEqualTo(
+                            ErrorCode.EXCEED_REFUNDABLE_QUANTITY
+                    );
+
+            verify(memberSpendingService, never())
+                    .subtractRefundAmount(
+                            anyLong(),
+                            anyLong()
+                    );
         }
     }
 
@@ -220,73 +454,254 @@ class RefundServiceTest {
     class Persistence {
 
         @Test
-        @DisplayName("[회귀] 계산된 RefundItem 은 반드시 refundItemRepository 로 저장되어야 한다")
+        @DisplayName("계산된 RefundItem은 반드시 refundItemRepository로 저장되어야 한다")
         void savesRefundItemsExplicitly() {
-            RefundItem calculatedItem = mock(RefundItem.class);
-            RefundCalculationResult calcResult = new RefundCalculationResult(List.of(calculatedItem), 9_000L);
-            stubBaseFlow(List.of(), calcResult);
+            // given
+            RefundItem calculatedItem =
+                    mock(RefundItem.class);
 
-            Refund savedRefund = mock(Refund.class);
-            when(refundRepository.save(any(Refund.class))).thenReturn(savedRefund);
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(calculatedItem),
+                            9_000L
+                    );
 
-            refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(1));
+            stubBaseFlow(
+                    List.of(),
+                    calcResult
+            );
 
-            // 연관관계 세팅만 하고 저장을 빼먹는 버그가 재발하면 이 검증에서 바로 잡힌다
-            verify(calculatedItem).assignRefund(savedRefund);
-            verify(refundItemRepository).saveAll(calcResult.refundItems());
+            Refund savedRefund =
+                    mock(Refund.class);
+
+            when(refundRepository.save(any(Refund.class)))
+                    .thenReturn(savedRefund);
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(1)
+            );
+
+            // then
+            verify(calculatedItem)
+                    .assignRefund(savedRefund);
+
+            verify(refundItemRepository)
+                    .saveAll(
+                            calcResult.refundItems()
+                    );
+
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            9_000L
+                    );
         }
 
         @Test
         @DisplayName("요청 수량이 남은 수량 전부와 같으면 전액 환불로 처리한다")
         void treatsAsFullRefundWhenRequestingAllRemainingQuantity() {
-            RefundItem calculatedItem = mock(RefundItem.class);
-            RefundCalculationResult calcResult = new RefundCalculationResult(List.of(calculatedItem), 27_000L);
-            stubBaseFlow(List.of(), calcResult);
-            when(refundRepository.save(any(Refund.class))).thenAnswer(inv -> inv.getArgument(0));
+            // given
+            RefundItem calculatedItem =
+                    mock(RefundItem.class);
 
-            // orderItem 수량 전체(2개)를 요청 -> 전액/마지막 환불
-            refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(2));
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(calculatedItem),
+                            27_000L
+                    );
 
-            verify(payment).fullRefund();
-            verify(order).transitTo(OrderStatus.CANCELED);
-            verify(payment, never()).partialRefund();
+            stubBaseFlow(
+                    List.of(),
+                    calcResult
+            );
 
-            ArgumentCaptor<Boolean> isFullRefundCaptor = ArgumentCaptor.forClass(Boolean.class);
-            verify(refundCalculator).calculate(any(), anyMap(), eq(payment), isFullRefundCaptor.capture(), anyLong());
-            assertThat(isFullRefundCaptor.getValue()).isTrue();
+            when(refundRepository.save(any(Refund.class)))
+                    .thenAnswer(
+                            invocation ->
+                                    invocation.getArgument(0)
+                    );
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(2)
+            );
+
+            // then
+            verify(payment)
+                    .fullRefund();
+
+            verify(order)
+                    .transitTo(OrderStatus.CANCELED);
+
+            verify(payment, never())
+                    .partialRefund();
+
+            ArgumentCaptor<Boolean> isFullRefundCaptor =
+                    ArgumentCaptor.forClass(Boolean.class);
+
+            verify(refundCalculator)
+                    .calculate(
+                            any(),
+                            anyMap(),
+                            eq(payment),
+                            isFullRefundCaptor.capture(),
+                            anyLong()
+                    );
+
+            assertThat(
+                    isFullRefundCaptor.getValue()
+            ).isTrue();
+
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            27_000L
+                    );
         }
 
         @Test
         @DisplayName("요청 수량이 남은 수량보다 적으면 부분 환불로 처리하고 주문은 취소하지 않는다")
         void treatsAsPartialRefundWhenRequestingLessThanRemaining() {
-            RefundItem calculatedItem = mock(RefundItem.class);
-            RefundCalculationResult calcResult = new RefundCalculationResult(List.of(calculatedItem), 9_000L);
-            stubBaseFlow(List.of(), calcResult);
-            when(refundRepository.save(any(Refund.class))).thenAnswer(inv -> inv.getArgument(0));
+            // given
+            RefundItem calculatedItem =
+                    mock(RefundItem.class);
 
-            // orderItem 수량 2개 중 1개만 요청 -> 부분 환불
-            refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(1));
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(calculatedItem),
+                            9_000L
+                    );
 
-            verify(payment).partialRefund();
-            verify(payment, never()).fullRefund();
-            verify(order, never()).transitTo(any());
+            stubBaseFlow(
+                    List.of(),
+                    calcResult
+            );
 
-            ArgumentCaptor<Boolean> isFullRefundCaptor = ArgumentCaptor.forClass(Boolean.class);
-            verify(refundCalculator).calculate(any(), anyMap(), eq(payment), isFullRefundCaptor.capture(), anyLong());
-            assertThat(isFullRefundCaptor.getValue()).isFalse();
+            when(refundRepository.save(any(Refund.class)))
+                    .thenAnswer(
+                            invocation ->
+                                    invocation.getArgument(0)
+                    );
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(1)
+            );
+
+            // then
+            verify(payment)
+                    .partialRefund();
+
+            verify(payment, never())
+                    .fullRefund();
+
+            verify(order, never())
+                    .transitTo(any());
+
+            ArgumentCaptor<Boolean> isFullRefundCaptor =
+                    ArgumentCaptor.forClass(Boolean.class);
+
+            verify(refundCalculator)
+                    .calculate(
+                            any(),
+                            anyMap(),
+                            eq(payment),
+                            isFullRefundCaptor.capture(),
+                            anyLong()
+                    );
+
+            assertThat(
+                    isFullRefundCaptor.getValue()
+            ).isFalse();
+
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            9_000L
+                    );
         }
 
         @Test
         @DisplayName("환불 대상 상품의 재고를 요청 수량만큼 복구한다")
         void restoresStockForRefundedQuantity() {
-            RefundItem calculatedItem = mock(RefundItem.class);
-            RefundCalculationResult calcResult = new RefundCalculationResult(List.of(calculatedItem), 9_000L);
-            stubBaseFlow(List.of(), calcResult);
-            when(refundRepository.save(any(Refund.class))).thenAnswer(inv -> inv.getArgument(0));
+            // given
+            RefundItem calculatedItem =
+                    mock(RefundItem.class);
 
-            refundService.calculateAndSaveRefund(MEMBER_ID, requestFor(1));
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(calculatedItem),
+                            9_000L
+                    );
 
-            verify(product).restoreStock(1);
+            stubBaseFlow(
+                    List.of(),
+                    calcResult
+            );
+
+            when(refundRepository.save(any(Refund.class)))
+                    .thenAnswer(
+                            invocation ->
+                                    invocation.getArgument(0)
+                    );
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(1)
+            );
+
+            // then
+            verify(product)
+                    .restoreStock(1);
+
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            9_000L
+                    );
+        }
+
+        @Test
+        @DisplayName("환불금액을 회원 누적 구매금액에서 차감한다")
+        void subtractsRefundAmountFromMemberSpending() {
+            // given
+            RefundItem calculatedItem =
+                    mock(RefundItem.class);
+
+            RefundCalculationResult calcResult =
+                    new RefundCalculationResult(
+                            List.of(calculatedItem),
+                            9_000L
+                    );
+
+            stubBaseFlow(
+                    List.of(),
+                    calcResult
+            );
+
+            when(refundRepository.save(any(Refund.class)))
+                    .thenAnswer(
+                            invocation ->
+                                    invocation.getArgument(0)
+                    );
+
+            // when
+            refundService.calculateAndSaveRefund(
+                    MEMBER_ID,
+                    requestFor(1)
+            );
+
+            // then
+            verify(memberSpendingService)
+                    .subtractRefundAmount(
+                            MEMBER_ID,
+                            9_000L
+                    );
         }
     }
 
@@ -297,41 +712,117 @@ class RefundServiceTest {
         @Test
         @DisplayName("이미 환불된 수량을 제외한 남은 수량을 반환한다")
         void returnsRemainingQuantityExcludingRefunded() {
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByIdWithOrderAndItems(PAYMENT_ID)).thenReturn(paymentWithItems);
-            when(refundItemRepository.findRefundedQuantitiesByOrderItemIds(List.of(ORDER_ITEM_ID)))
-                    .thenReturn(List.of(new RefundedQuantity(ORDER_ITEM_ID, 1)));
+            // given
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            List<RefundableItemResponse> result = refundService.getRefundableItems(MEMBER_ID, PAYMENT_ID);
+            when(
+                    paymentService.findByIdWithOrderAndItems(
+                            PAYMENT_ID
+                    )
+            ).thenReturn(paymentWithItems);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).originalQuantity()).isEqualTo(2);
-            assertThat(result.get(0).remainQuantity()).isEqualTo(1); // 2개 중 1개 이미 환불
+            when(
+                    refundItemRepository
+                            .findRefundedQuantitiesByOrderItemIds(
+                                    List.of(ORDER_ITEM_ID)
+                            )
+            ).thenReturn(
+                    List.of(
+                            new RefundedQuantity(
+                                    ORDER_ITEM_ID,
+                                    1
+                            )
+                    )
+            );
+
+            // when
+            List<RefundableItemResponse> result =
+                    refundService.getRefundableItems(
+                            MEMBER_ID,
+                            PAYMENT_ID
+                    );
+
+            // then
+            assertThat(result)
+                    .hasSize(1);
+
+            assertThat(
+                    result.get(0).originalQuantity()
+            ).isEqualTo(2);
+
+            assertThat(
+                    result.get(0).remainQuantity()
+            ).isEqualTo(1);
         }
 
         @Test
         @DisplayName("환불 이력이 없으면 원래 수량 그대로 환불 가능하다")
         void returnsOriginalQuantityWhenNoRefundHistory() {
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByIdWithOrderAndItems(PAYMENT_ID)).thenReturn(paymentWithItems);
-            when(refundItemRepository.findRefundedQuantitiesByOrderItemIds(List.of(ORDER_ITEM_ID)))
-                    .thenReturn(List.of());
+            // given
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            List<RefundableItemResponse> result = refundService.getRefundableItems(MEMBER_ID, PAYMENT_ID);
+            when(
+                    paymentService.findByIdWithOrderAndItems(
+                            PAYMENT_ID
+                    )
+            ).thenReturn(paymentWithItems);
 
-            assertThat(result.get(0).remainQuantity()).isEqualTo(2);
+            when(
+                    refundItemRepository
+                            .findRefundedQuantitiesByOrderItemIds(
+                                    List.of(ORDER_ITEM_ID)
+                            )
+            ).thenReturn(List.of());
+
+            // when
+            List<RefundableItemResponse> result =
+                    refundService.getRefundableItems(
+                            MEMBER_ID,
+                            PAYMENT_ID
+                    );
+
+            // then
+            assertThat(
+                    result.get(0).remainQuantity()
+            ).isEqualTo(2);
         }
 
         @Test
         @DisplayName("본인 소유가 아닌 결제 건이면 접근 거부 예외를 던진다")
         void rejectsWhenNotOwner() {
-            PaymentWithItems paymentWithItems = new PaymentWithItems(payment, List.of(orderItem));
-            when(paymentService.findByIdWithOrderAndItems(PAYMENT_ID)).thenReturn(paymentWithItems);
+            // given
+            PaymentWithItems paymentWithItems =
+                    new PaymentWithItems(
+                            payment,
+                            List.of(orderItem)
+                    );
 
-            assertThatThrownBy(() -> refundService.getRefundableItems(999L, PAYMENT_ID))
+            when(
+                    paymentService.findByIdWithOrderAndItems(
+                            PAYMENT_ID
+                    )
+            ).thenReturn(paymentWithItems);
+
+            // when & then
+            assertThatThrownBy(
+                    () -> refundService.getRefundableItems(
+                            999L,
+                            PAYMENT_ID
+                    )
+            )
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
-                    .isEqualTo(ErrorCode.REFUND_ACCESS_DENIED);
+                    .isEqualTo(
+                            ErrorCode.REFUND_ACCESS_DENIED
+                    );
         }
     }
 }

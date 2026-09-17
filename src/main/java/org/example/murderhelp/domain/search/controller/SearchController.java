@@ -7,8 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.search.dto.PopularSearchResponse;
 import org.example.murderhelp.domain.search.service.PopularSearchService;
 import org.example.murderhelp.global.response.ApiResponse;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -24,18 +25,18 @@ public class SearchController {
     private final PopularSearchService popularSearchService;
 
     @GetMapping("/api/searches/popular")
-    public ApiResponse<List<PopularSearchResponse>> getPopularSearches(
+    public ResponseEntity<ApiResponse<List<PopularSearchResponse>>> getPopularSearches(
             @RequestParam(defaultValue = "10") @Min(1) @Max(10) int limit
     ) {
-        return ApiResponse.ok(popularSearchService.getPopularSearches(limit));
+        return ResponseEntity.ok(ApiResponse.ok(popularSearchService.getPopularSearches(limit)));
     }
 
     @PostMapping("/api/searches/popular")
-    public ApiResponse<Void> recordPopularSearch(
+    public ResponseEntity<ApiResponse<Void>> recordPopularSearch(
             Authentication authentication,
             @RequestParam @NotBlank String keyword
     ) {
         popularSearchService.recordSearch(authentication.getName(), keyword);
-        return ApiResponse.ok();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }

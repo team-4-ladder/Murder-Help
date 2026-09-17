@@ -31,7 +31,7 @@ public class ProductService {
     @Transactional
     public List<Product> getProducts(List<Long> productIds) {
         if (productIds == null || productIds.stream().anyMatch(id -> id == null)) {
-            throw new IllegalArgumentException("상품 ID는 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "상품 ID는 필수입니다.");
         }
         if (productIds.isEmpty()) {
             return List.of();
@@ -170,14 +170,14 @@ public class ProductService {
 
     private String normalizeRequiredKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {
-            throw new IllegalArgumentException("검색어는 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "검색어는 필수입니다.");
         }
         return keyword.trim();
     }
 
     private String normalizeRequiredCategory(String category) {
         if (category == null || category.isBlank()) {
-            throw new IllegalArgumentException("카테고리는 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "카테고리는 필수입니다.");
         }
         return category.trim();
     }

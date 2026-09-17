@@ -1,7 +1,10 @@
 package org.example.murderhelp.domain.product.dto;
 
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.data.domain.Sort;
 
+import java.util.Arrays;
 import java.util.Locale;
 
 public enum ProductSort {
@@ -15,11 +18,14 @@ public enum ProductSort {
             return POPULAR;
         }
 
-        try {
-            return valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("지원하지 않는 상품 정렬 방식입니다: " + value);
-        }
+        String normalizedValue = value.trim().toUpperCase(Locale.ROOT);
+        return Arrays.stream(values())
+                .filter(sort -> sort.name().equals(normalizedValue))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "지원하지 않는 상품 정렬 방식입니다: " + value
+                ));
     }
 
     public Sort toSort() {

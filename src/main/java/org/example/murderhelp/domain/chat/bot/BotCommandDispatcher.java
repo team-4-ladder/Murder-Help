@@ -79,7 +79,7 @@ public class BotCommandDispatcher {
                 .toList();
 
         BotMessageDto messageDto = BotMessageDto.builder()
-                .text("고객님의 등급에 맞는 추천 무기 리스트입니다.\n주간 베스트 🏆")
+                .title("고객님의 등급에 맞는 추천 무기 리스트입니다.\n주간 베스트 🏆")
                 .options(BotScenario.Constants.RETURN_MENU_OPTIONS)
                 .products(productDtos)
                 .build();
@@ -93,19 +93,28 @@ public class BotCommandDispatcher {
                 PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
 
-        String text;
+        String title;
+        String text = null;
+        Long orderId = null;
+        String orderStatus = null;
         if (orders.isEmpty()) {
-            text = "최근 3개월간 결제하신 주문 내역이 없습니다.";
+            title = "최근 3개월간 결제하신 주문 내역이 없습니다.";
         } else {
             OrderResponse order = orders.getContent().get(0);
+            orderId = order.orderId();
+            orderStatus = order.status().name();
             String firstItemName = order.items().get(0).productName();
             int extraCount = order.items().size() - 1;
             String productTitle = extraCount > 0 ? String.format("%s 외 %d건", firstItemName, extraCount) : firstItemName;
-            text = String.format("📦 [최근 주문 내역 안내]\n\n▪️ 주문 상품: %s\n▪️ 진행 상태: %s", productTitle, order.status().name());
+            title = "📦 [최근 주문 내역 안내]";
+            text = String.format("▪️ 주문 상품: %s", productTitle);
         }
 
         BotMessageDto messageDto = BotMessageDto.builder()
+                .title(title)
                 .text(text)
+                .orderId(orderId)
+                .orderStatus(orderStatus)
                 .options(BotScenario.Constants.RETURN_MENU_OPTIONS)
                 .build();
         svc.sendBotMessage(room, messageDto);

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
 import ChatRoomView from "./ChatRoomView";
 import type {ChatRoomResponse, PageResponse} from "./chat.types";
 import { getAccessToken } from "@/api/client.ts";
+import { TierBadge } from "../member/TierBadge";
+import { TIERS, gradeToTier } from "../../lib/tier";
+import { subscribeChatSocket } from "./chatSocket";
 
 type TabType = "ALL" | "WAITING" | "IN_PROGRESS" | "COMPLETED";
 
@@ -13,9 +14,10 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
   const [activeTab, setActiveTab] = useState<TabType>("ALL");
   const [searchInput, setSearchInput] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
-  const stompClient = useRef<Client | null>(null);
   const activeTabRef = useRef<TabType>(activeTab);
   const selectedRoomIdRef = useRef<number | null>(selectedRoomId);
+  const fetchRoomsRequestId = useRef(0);
+  const fetchTabCountsRequestId = useRef(0);
 
   const [isError, setIsError] = useState(false);
   const [waitingCount, setWaitingCount] = useState(0);
@@ -33,19 +35,23 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
 
   // 🔹 별도로 WAITING과 IN_PROGRESS 개수를 병렬로 가져오는 함수 (size=1)
   const fetchTabCounts = async () => {
+    const requestId = ++fetchTabCountsRequestId.current;
     try {
       const headers = { Authorization: `Bearer ${getAccessToken()}` };
       const [waitingRes, inProgressRes] = await Promise.all([
         fetch(`/api/chat/rooms?status=WAITING&size=1`, { headers }),
         fetch(`/api/chat/rooms?status=IN_PROGRESS&size=1`, { headers })
       ]);
-      
+
+      // 더 최근 호출이 이미 시작됐다면 이 응답은 오래된 것이므로 무시한다.
+      if (requestId !== fetchTabCountsRequestId.current) return;
+
       if (waitingRes.ok) {
         const json = await waitingRes.json();
         const pageData = (json.data ? json.data : json) as PageResponse<ChatRoomResponse>;
         setWaitingCount(pageData.totalElements || 0);
       }
-      
+
       if (inProgressRes.ok) {
         const json = await inProgressRes.json();
         const pageData = (json.data ? json.data : json) as PageResponse<ChatRoomResponse>;
@@ -57,28 +63,32 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
   };
 
   const fetchRooms = async () => {
+    const requestId = ++fetchRoomsRequestId.current;
     setIsLoading(true);
     setIsError(false);
     try {
       const query = new URLSearchParams();
       if (activeTab !== "ALL") query.append("status", activeTab);
       if (searchKeyword.trim() !== "") query.append("keyword", searchKeyword);
-      
+
       const res = await fetch(`/api/chat/rooms?${query.toString()}&size=100`, {
         headers: { Authorization: `Bearer ${getAccessToken()}` }
       });
       if (!res.ok) throw new Error("방 목록 조회 실패");
       const json = await res.json();
       const pageData = (json.data ? json.data : json) as PageResponse<ChatRoomResponse>;
+
+      // 더 최근 탭 전환/검색으로 인한 요청이 이미 시작됐다면 이 응답은 버린다.
+      if (requestId !== fetchRoomsRequestId.current) return;
+
       setRooms(pageData.content);
-      
-      // 꼼수 로직 제거: 탭 이동 시 무조건 서버에서 정확한 대기/진행중 개수를 가져옴
       fetchTabCounts();
     } catch (err) {
+      if (requestId !== fetchRoomsRequestId.current) return;
       console.warn("방 목록 조회 에러:", err);
       setIsError(true);
     } finally {
-      setIsLoading(false);
+      if (requestId === fetchRoomsRequestId.current) setIsLoading(false);
     }
   };
 
@@ -87,53 +97,52 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
   }, [activeTab, searchKeyword]);
 
   useEffect(() => {
-    const client = new Client({
-      webSocketFactory: () => new SockJS("/ws"),
-      connectHeaders: {
-        Authorization: `Bearer ${getAccessToken()}`
-      },
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe("/sub/chat/rooms/updates", (msg) => {
-          const updatedRoom = JSON.parse(msg.body) as ChatRoomResponse;
-          
-          setRooms(prev => {
-            const currentTab = activeTabRef.current;
-            const currentRoomId = selectedRoomIdRef.current;
-            
-            // ✨ 핵심: 내가 현재 열어둔 방의 상태가 변했고, 그 상태가 현재 탭과 다를 때
-            if (currentRoomId === updatedRoom.roomId && currentTab !== "ALL" && updatedRoom.status !== currentTab) {
-              // 탭을 새로운 상태로 강제 전환 (이후 fetchRooms가 돌아가서 목록이 갱신됨)
-              setActiveTab(updatedRoom.status as TabType);
-              return prev; // 탭이 바뀌면서 리스트 전체를 다시 불러오므로 여기선 가만히 둠
-            }
+    const unsubscribe = subscribeChatSocket("/sub/chat/rooms/updates", (body) => {
+      const updatedRoom = JSON.parse(body) as ChatRoomResponse;
 
-            // 내가 열어둔 방이 아니라면 기존처럼 조용히 목록 갱신
-            if (currentTab !== "ALL" && updatedRoom.status !== currentTab) {
-              return prev.filter(r => r.roomId !== updatedRoom.roomId);
-            }
+      setRooms(prev => {
+        const currentTab = activeTabRef.current;
+        const currentRoomId = selectedRoomIdRef.current;
 
-            const exists = prev.find(r => r.roomId === updatedRoom.roomId);
-            if (exists) {
-              return prev.map(r => r.roomId === updatedRoom.roomId ? updatedRoom : r);
-            } else {
-              return [updatedRoom, ...prev];
-            }
-          });
+        // ✨ 핵심: 내가 현재 열어둔 방의 상태가 변했고, 그 상태가 현재 탭과 다를 때
+        if (currentRoomId === updatedRoom.roomId && currentTab !== "ALL" && updatedRoom.status !== currentTab) {
+          // 탭을 새로운 상태로 강제 전환 (이후 fetchRooms가 돌아가서 목록이 갱신됨)
+          setActiveTab(updatedRoom.status as TabType);
+          return prev; // 탭이 바뀌면서 리스트 전체를 다시 불러오므로 여기선 가만히 둠
+        }
 
-          // WebSocket으로 상태 변경 알림이 오면 묻지도 따지지도 않고 전체 카운트 단건 갱신
-          fetchTabCounts();
-        });
-      }
+        // 내가 열어둔 방이 아니라면 기존처럼 조용히 목록 갱신
+        if (currentTab !== "ALL" && updatedRoom.status !== currentTab) {
+          return prev.filter(r => r.roomId !== updatedRoom.roomId);
+        }
+
+        const exists = prev.find(r => r.roomId === updatedRoom.roomId);
+        if (exists) {
+          return prev.map(r => r.roomId === updatedRoom.roomId ? updatedRoom : r);
+        } else {
+          return [updatedRoom, ...prev];
+        }
+      });
+
+      // WebSocket으로 상태 변경 알림이 오면 묻지도 따지지도 않고 전체 카운트 단건 갱신
+      fetchTabCounts();
     });
 
-    client.activate();
-    stompClient.current = client;
-
     return () => {
-      client.deactivate();
+      unsubscribe();
     };
   }, []);
+
+  // 현재 선택된 방이 (탭 전환/검색/실시간 갱신 등으로) 목록에서 사라지면
+  // 목록의 첫 방으로 자동 전환하거나, 목록이 비었으면 선택을 완전히 해제한다.
+  useEffect(() => {
+    const stillExists = rooms.some(r => r.roomId === selectedRoomId);
+    if (stillExists) return;
+    setSelectedRoomId(rooms.length > 0 ? rooms[0].roomId : null);
+  }, [rooms, selectedRoomId]);
+
+  const selectedRoom = rooms.find(r => r.roomId === selectedRoomId);
+  const isSelectedRoomCompleted = selectedRoom?.status === 'COMPLETED';
 
   return (
     // 전체 배경 컨테이너 (부드러운 차콜 다크: Zinc-950)
@@ -226,11 +235,9 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
               const isSelected = selectedRoomId === room.roomId;
               
               let badgeStyle = 'bg-[#27272a] text-[#a1a1aa] border-[#3f3f46]';
-              if (room.status === 'WAITING') badgeStyle = 'bg-[#f4f4f5] text-[#18181b] border-[#f4f4f5] shadow-sm';
+              if (room.status === 'BOT_MODE') badgeStyle = 'bg-violet-500/10 text-violet-300 border-violet-500/30';
+              else if (room.status === 'WAITING') badgeStyle = 'bg-[#f4f4f5] text-[#18181b] border-[#f4f4f5] shadow-sm';
               else if (room.status === 'COMPLETED') badgeStyle = 'bg-transparent text-[#71717a] border-[#27272a]';
-
-              // 아바타 이니셜 추출 (예: REQ-CUST... -> C)
-              const initial = room.title.replace('REQ-CUST', '').charAt(3).toUpperCase() || '?';
 
               return (
                 <div 
@@ -242,14 +249,24 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
                       : 'bg-transparent border-transparent hover:bg-[#27272a]/50'
                   }`}
                 >
-                  {/* 아바타 (Avatar Icon) */}
-                  <div className="w-10 h-10 flex-shrink-0 rounded-full bg-[#3f3f46] flex items-center justify-center text-sm font-bold text-white shadow-inner">
-                    {initial !== '?' ? initial : '👤'}
+                  {/* 프로필 이미지 (Avatar) */}
+                  <div
+                    className="w-10 h-10 flex-shrink-0 rounded-full bg-[#240606] border-2 overflow-hidden flex items-center justify-center shadow-inner"
+                    style={{ borderColor: room.customerGrade ? TIERS[gradeToTier(room.customerGrade)].brightColor : "#3f3f46" }}
+                  >
+                    {room.customerProfileImageUrl ? (
+                      <img src={room.customerProfileImageUrl} alt="profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 100 100" width="24" height="24" aria-label="기본 프로필 이미지">
+                        <circle cx="50" cy="34" r="17" fill="#8b544d" />
+                        <path d="M20 88c4-21 17-31 30-31s26 10 30 31" fill="#8b544d" />
+                      </svg>
+                    )}
                   </div>
                   
                   {/* 메시지 정보 영역 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center mb-0.5">
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex justify-between items-center">
                       <span className={`font-semibold text-sm truncate pr-2 ${isSelected ? 'text-[#f4f4f5]' : 'text-[#d4d4d8]'}`}>
                         {room.title}
                       </span>
@@ -257,12 +274,17 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
                         {room.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs truncate ${isSelected ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
-                        {room.lastMessage ? room.lastMessage : '새로운 대화가 없습니다.'}
+                    <span className="block text-xs text-neutral-400 truncate">
+                      {room.customerName ?? "—"} · {room.customerEmail ?? "—"}
+                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs truncate min-w-0 ${isSelected ? 'text-[#a1a1aa]' : 'text-[#71717a]'}`}>
+                        {room.status === "COMPLETED"
+                          ? "상담이 종료된 방입니다."
+                          : (room.lastMessage ?? "새로운 대화가 없습니다.")}
                       </span>
-                      <span className="text-[9px] text-[#52525b] whitespace-nowrap pl-2">
-                        {new Date(room.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      <span className="shrink-0 text-[11px] text-neutral-500">
+                        {room.updatedAt.slice(11, 16)}
                       </span>
                     </div>
                   </div>
@@ -280,51 +302,53 @@ export default function AdminChatDashboard({ adminId }: { adminId: number }) {
 
         {/* 오른쪽 카드: 채팅 화면 */}
         <div className="flex-1 flex flex-col bg-[#18181b] border border-[#27272a] rounded-xl shadow-lg overflow-hidden">
-          {selectedRoomId ? (
-            (() => {
-              const selectedRoom = rooms.find(r => r.roomId === selectedRoomId);
-              const isCompleted = selectedRoom?.status === 'COMPLETED';
-              return (
-                <>
-                  <div className="px-8 py-5 border-b border-[#27272a] flex justify-between items-center bg-[#18181b] z-10">
-                    <div className="flex items-center gap-3">
-                      <h3 className={`font-semibold text-lg tracking-tight ${isCompleted ? 'text-[#71717a]' : 'text-[#f4f4f5]'}`}>
-                        Support Channel #{selectedRoomId}
-                      </h3>
-                    </div>
-                    {!isCompleted && (
-                      <button 
-                        onClick={() => {
-                          fetch(`/api/chat/rooms/${selectedRoomId}/close`, { 
-                            method: "PATCH",
-                            headers: {
-                              Authorization: `Bearer ${getAccessToken()}`
-                            }
-                          })
-                            .then(res => {
-                              if (!res.ok) throw new Error("채널 닫기 실패");
-                            })
-                            .catch(err => alert(err.message));
-                        }}
-                        className="px-4 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-[#e4e4e7] border border-[#3f3f46] rounded-md text-xs font-medium transition-colors shadow-sm"
-                      >
-                        Close Channel
-                      </button>
+          {selectedRoom ? (
+            <>
+              <div className="px-8 py-5 border-b border-[#27272a] flex justify-between items-center bg-[#18181b] z-10">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <h3 className={`font-semibold text-lg tracking-tight ${isSelectedRoomCompleted ? 'text-[#71717a]' : 'text-[#f4f4f5]'}`}>
+                    Support Channel #{selectedRoom.roomId}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-400 min-w-0">
+                    <span className="truncate min-w-0 flex-1">
+                      {selectedRoom.customerName ?? "—"} · {selectedRoom.customerEmail ?? "—"}
+                    </span>
+                    {selectedRoom.customerGrade && (
+                      <TierBadge tier={gradeToTier(selectedRoom.customerGrade)} compact />
                     )}
                   </div>
-                  <div className="flex-1 relative overflow-hidden bg-[#0e0e11]">
-                    <ChatRoomView key={selectedRoomId} roomId={selectedRoomId} customerId={adminId} isAdmin={true} />
-                  </div>
-                </>
-              );
-            })()
+                </div>
+                {!isSelectedRoomCompleted && (
+                  <button
+                    onClick={() => {
+                      fetch(`/api/chat/rooms/${selectedRoom.roomId}/close`, {
+                        method: "PATCH",
+                        headers: {
+                          Authorization: `Bearer ${getAccessToken()}`
+                        }
+                      })
+                        .then(res => {
+                          if (!res.ok) throw new Error("채널 닫기 실패");
+                        })
+                        .catch(err => alert(err.message));
+                    }}
+                    className="px-4 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-[#e4e4e7] border border-[#3f3f46] rounded-md text-xs font-medium transition-colors shadow-sm"
+                  >
+                    Close Channel
+                  </button>
+                )}
+              </div>
+              <div className="flex-1 relative overflow-hidden bg-[#0e0e11]">
+                <ChatRoomView key={selectedRoom.roomId} roomId={selectedRoom.roomId} customerId={adminId} isAdmin={true} />
+              </div>
+            </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-[#52525b]">
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
-              <p className="text-sm font-medium">Select a channel to view</p>
+              <p className="text-sm font-medium">대화할 채팅방을 선택해 주세요</p>
             </div>
           )}
         </div>

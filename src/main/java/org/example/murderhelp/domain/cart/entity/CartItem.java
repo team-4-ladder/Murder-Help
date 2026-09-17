@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 import org.example.murderhelp.domain.member.entity.Member;
 import org.example.murderhelp.domain.product.entity.Product;
 import org.example.murderhelp.global.entity.BaseTimeEntity;
+import org.example.murderhelp.global.error.BusinessException;
+import org.example.murderhelp.global.error.ErrorCode;
 
 @Entity
 @Table(
@@ -56,10 +58,10 @@ public class CartItem extends BaseTimeEntity {
 
     private CartItem(Member member, Product product, int quantity) {
         if (member == null) {
-            throw new IllegalArgumentException("회원은 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "회원은 필수입니다.");
         }
         if (product == null) {
-            throw new IllegalArgumentException("상품은 필수입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "상품은 필수입니다.");
         }
         validateQuantity(quantity);
         product.validatePurchasable(quantity);
@@ -88,7 +90,7 @@ public class CartItem extends BaseTimeEntity {
 
     private static void validateQuantity(int quantity) {
         if (quantity < 1) {
-            throw new IllegalArgumentException("장바구니 수량은 1 이상이어야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "장바구니 수량은 1 이상이어야 합니다.");
         }
     }
 }

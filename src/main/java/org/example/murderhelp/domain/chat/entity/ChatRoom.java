@@ -36,7 +36,7 @@ public class ChatRoom extends BaseTimeEntity {
     private ChatRoomStatus status;
 
     @Builder
-    public ChatRoom(String title, Member customer) {
+    private ChatRoom(String title, Member customer) {
         this.title = title;
         this.customer = customer;
         this.status = ChatRoomStatus.BOT_MODE; // 기본값: 챗봇 모드

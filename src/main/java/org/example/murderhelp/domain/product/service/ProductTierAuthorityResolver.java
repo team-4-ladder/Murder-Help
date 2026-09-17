@@ -6,6 +6,7 @@ import org.example.murderhelp.global.error.ErrorCode;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Comparator;
 
 @Component
@@ -35,10 +36,9 @@ public class ProductTierAuthorityResolver {
                 ? authority.substring(ROLE_PREFIX.length())
                 : authority;
 
-        try {
-            return ProductTier.valueOf(tierName);
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
+        return Arrays.stream(ProductTier.values())
+                .filter(tier -> tier.name().equals(tierName))
+                .findFirst()
+                .orElse(null);
     }
 }

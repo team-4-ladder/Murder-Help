@@ -10,6 +10,7 @@ import org.example.murderhelp.domain.product.service.ProductTierAuthorityResolve
 import org.example.murderhelp.global.response.ApiResponse;
 import org.example.murderhelp.global.response.PageResponse;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,16 +25,16 @@ public class ProductController {
     private final ProductTierAuthorityResolver productTierAuthorityResolver;
 
     @GetMapping("/api/products/{productId}")
-    public ApiResponse<ProductDetailResponse> getProduct(
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> getProduct(
             Authentication authentication,
             @PathVariable Long productId
     ) {
         ProductTier memberTier = productTierAuthorityResolver.resolve(authentication);
-        return ApiResponse.ok(productService.getProduct(memberTier, productId));
+        return ResponseEntity.ok(ApiResponse.ok(productService.getProduct(memberTier, productId)));
     }
 
     @GetMapping("/api/products")
-    public ApiResponse<PageResponse<ProductResponse>> getProducts(
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProducts(
             Authentication authentication,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subCategory,
@@ -45,7 +46,7 @@ public class ProductController {
         ProductTier requestedTier = ProductTier.fromValue(tier);
         ProductSort productSort = ProductSort.fromValue(sort);
 
-        return ApiResponse.ok(
+        return ResponseEntity.ok(ApiResponse.ok(
                 productService.getProducts(
                         memberTier,
                         requestedTier,
@@ -54,11 +55,11 @@ public class ProductController {
                         productSort,
                         pageable
                 )
-        );
+        ));
     }
 
     @GetMapping("/api/v1/products/search")
-    public ApiResponse<PageResponse<ProductResponse>> searchProducts(
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> searchProducts(
             Authentication authentication,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String tier,
@@ -76,7 +77,7 @@ public class ProductController {
                 productSort,
                 pageable
         );
-        return ApiResponse.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     /**
@@ -86,7 +87,7 @@ public class ProductController {
      * {@code @Cacheable} 프록시가 걸린다)에 위임한다.
      */
     @GetMapping("/api/v2/products/search")
-    public ApiResponse<PageResponse<ProductResponse>> searchProductsV2(
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> searchProductsV2(
             Authentication authentication,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String tier,
@@ -105,6 +106,6 @@ public class ProductController {
                 productSort,
                 pageable
         );
-        return ApiResponse.ok(response);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }
