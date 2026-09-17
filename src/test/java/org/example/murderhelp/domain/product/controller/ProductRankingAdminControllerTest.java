@@ -1,6 +1,6 @@
 package org.example.murderhelp.domain.product.controller;
 
-import org.example.murderhelp.domain.product.scheduler.ProductRankingScheduler;
+import org.example.murderhelp.domain.chat.scheduler.ChatbotRankingScheduler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,7 +24,7 @@ class ProductRankingAdminControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private ProductRankingScheduler productRankingScheduler;
+    private ChatbotRankingScheduler chatbotRankingScheduler;
 
     @Test
     void GREEN_등급은_수동으로_상품_랭킹을_갱신할_수_있다() throws Exception {
@@ -33,7 +33,7 @@ class ProductRankingAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("SUCCESS"));
 
-        verify(productRankingScheduler).runWeeklyBestUpdate();
+        verify(chatbotRankingScheduler).runWeeklyBestUpdate();
     }
 
     @Test

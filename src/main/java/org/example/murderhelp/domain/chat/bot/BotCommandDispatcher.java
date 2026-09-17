@@ -2,6 +2,7 @@ package org.example.murderhelp.domain.chat.bot;
 
 import jakarta.annotation.PostConstruct;
 import org.example.murderhelp.domain.chat.entity.ChatRoom;
+import org.example.murderhelp.domain.chat.redis.ChatbotRankingCache;
 import org.example.murderhelp.domain.chat.service.ChatMessageService;
 import org.example.murderhelp.domain.order.service.OrderService;
 import org.example.murderhelp.domain.order.dto.OrderListRequest;
@@ -12,11 +13,9 @@ import org.example.murderhelp.domain.chat.bot.dto.BotProductDto;
 import org.example.murderhelp.domain.product.entity.Product;
 import org.example.murderhelp.domain.product.entity.ProductTier;
 import org.example.murderhelp.domain.product.service.ProductService;
-import org.example.murderhelp.domain.product.service.ProductRankingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
@@ -31,7 +30,7 @@ public class BotCommandDispatcher {
 
     private final OrderService orderService;
     private final ProductService productService;
-    private final StringRedisTemplate redisTemplate;
+    private final ChatbotRankingCache chatbotRankingCache;
     private final Map<BotCommand, BiConsumer<ChatRoom, ChatMessageService>> actionMap = new EnumMap<>(BotCommand.class);
 
     @PostConstruct
@@ -56,20 +55,18 @@ public class BotCommandDispatcher {
 
     private void handleRecommendWeapon(ChatRoom room, ChatMessageService svc) {
         String userTierName = room.getCustomer().getGrade().name();
-        String userTier = userTierName.toLowerCase();
-        String redisKey = ProductRankingService.RANKING_TARGET_KEY_PREFIX + userTier;
-        
-        List<String> topProductIdsStr = redisTemplate.opsForList().range(redisKey, 0, -1);
-        
+        ProductTier userProductTier = ProductTier.valueOf(userTierName);
+
+        List<String> topProductIdsStr = chatbotRankingCache.getRanking(userProductTier);
+
         List<Product> products;
         if (topProductIdsStr != null && !topProductIdsStr.isEmpty()) {
             List<Long> ids = topProductIdsStr.stream().map(Long::valueOf).toList();
             products = productService.getProducts(ids);
-            
+
             // Redis에서 꺼낸 랭킹 순서(ids)대로 상품 리스트 재정렬
             products.sort(Comparator.comparing(p -> ids.indexOf(p.getId())));
         } else {
-            ProductTier userProductTier = ProductTier.valueOf(userTierName);
             // Fallback 로직: 최근 7일간 판매가 없으면 '최신 상품' 중 유저가 볼 수 있는 것 5개를 DB 쿼리 레벨에서 가져오기
             products = productService.getNewestProducts(userProductTier);
         }
