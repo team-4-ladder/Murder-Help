@@ -4,9 +4,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.murderhelp.domain.chat.dto.ChatMessageSendRequest;
 import org.example.murderhelp.domain.chat.service.ChatMessageService;
+import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.resolver.StompMemberId;
+import org.example.murderhelp.global.response.ApiResponse;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -36,5 +40,19 @@ public class ChatStompController {
         );
 
         chatMessageService.sendMessage(secureRequest);
+    }
+
+    /**
+     * @MessageMapping 처리 중 발생한 BusinessException을 잡아
+     * 요청을 보낸 클라이언트의 /user/queue/errors 채널로 에러 응답을 전달한다.
+     * GlobalExceptionHandler는 HTTP 파이프라인 전용이므로 STOMP 예외는 여기서 별도 처리한다.
+     *
+     * @param e 발생한 비즈니스 예외
+     * @return 에러 코드와 메시지를 담은 ApiResponse
+     */
+    @MessageExceptionHandler(BusinessException.class)
+    @SendToUser("/queue/errors")
+    public ApiResponse<Void> handleBusinessException(BusinessException e) {
+        return ApiResponse.error(e.getErrorCode(), e.getMessage());
     }
 }

@@ -3,7 +3,7 @@ import type { ChatMessageResponse, ChatRoomResponse, ChatRoomStatus } from "./ch
 import { getAccessToken } from "../../api/client";
 import { subscribeChatSocket, onChatSocketReconnect, isChatSocketConnected, publishChatSocket } from "./chatSocket";
 
-export function useChatRoom(roomId: number) {
+export function useChatRoom(roomId: number, isAdmin: boolean = false) {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
   const [lastMessageId, setLastMessageId] = useState<number | null>(null);
   const [hasNext, setHasNext] = useState(true);
@@ -12,6 +12,8 @@ export function useChatRoom(roomId: number) {
   const [status, setStatus] = useState<ChatRoomStatus>("BOT_MODE");
   const [isError, setIsError] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [sendError, setSendError] = useState<{ message: string; id: number } | null>(null);
+  const sendErrorIdRef = useRef(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number>(0);
@@ -55,8 +57,14 @@ export function useChatRoom(roomId: number) {
       pendingScrollTimeouts.current.add(timeoutId);
     });
 
-    // 실시간 방 상태 업데이트 구독 (상담사 연결 등으로 상태가 변경될 때 즉각 반영)
-    const unsubscribeRoomUpdates = subscribeChatSocket('/sub/chat/rooms/updates', (body) => {
+    // 실시간 방 상태 업데이트 구독
+    // - 관리자: /sub/chat/rooms/updates (GREEN만 허용, 전체 방 목록 갱신용)
+    // - 고객:   /sub/chat/room/{roomId}/status (방 주인만 허용, 본인 방 상태 전용)
+    const roomStatusDest = isAdmin
+      ? '/sub/chat/rooms/updates'
+      : `/sub/chat/room/${roomId}/status`;
+
+    const unsubscribeRoomUpdates = subscribeChatSocket(roomStatusDest, (body) => {
       try {
         const updatedRoom = JSON.parse(body) as ChatRoomResponse;
         if (updatedRoom.roomId === roomId) {
@@ -76,10 +84,24 @@ export function useChatRoom(roomId: number) {
       loadMoreMessages(true);
     });
 
+    // 메시지 전송 실패 에러 수신 — 서버의 @MessageExceptionHandler가 /user/queue/errors로 내려보냄
+    const unsubscribeErrors = subscribeChatSocket("/user/queue/errors", (body) => {
+      let message = "메시지 전송에 실패했습니다.";
+      try {
+        const errorResponse = JSON.parse(body) as { code: string; message: string };
+        message = errorResponse.message ?? message;
+      } catch {
+        // JSON 파싱 실패 시 기본 메시지 사용
+      }
+      sendErrorIdRef.current += 1;
+      setSendError({ message, id: sendErrorIdRef.current });
+    });
+
     return () => {
       unsubscribeMessages();
       unsubscribeRoomUpdates();
       unsubscribeReconnect();
+      unsubscribeErrors();
       pendingScrollTimeouts.current.forEach(id => clearTimeout(id));
       pendingScrollTimeouts.current.clear();
     };
@@ -166,6 +188,7 @@ export function useChatRoom(roomId: number) {
     isCompleted,
     status,
     isError,
+    sendError,
     showScrollBottom,
     containerRef,
     handleScroll,

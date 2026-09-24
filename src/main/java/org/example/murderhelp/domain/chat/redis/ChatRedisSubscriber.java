@@ -21,9 +21,7 @@ public class ChatRedisSubscriber implements MessageListener {
 
     /**
      * Redis Pub/Sub("chat-room:*" 패턴)으로 수신한 메시지를 역직렬화해
-     * 적절한 STOMP 목적지로 다시 브로드캐스트한다. ChatMessageResponse면 해당 방 채널로,
-     * ChatRoomResponse면 방 목록 갱신 채널("/sub/chat/rooms/updates")로 전달한다.
-     * 다중 서버 인스턴스 환경에서도 모든 웹소켓 클라이언트가 동일한 이벤트를 받을 수 있게 하는 역할이다.
+     * 적절한 STOMP 목적지로 다시 브로드캐스트한다.
      *
      * @param message Redis에서 수신한 원본 메시지 (직렬화된 페이로드)
      * @param pattern 매칭된 구독 패턴 (사용하지 않음)
@@ -33,13 +31,15 @@ public class ChatRedisSubscriber implements MessageListener {
         try {
             // RedisConfig에 등록해둔 ValueSerializer를 사용해 역직렬화!
             Object deserialized = redisTemplate.getValueSerializer().deserialize(message.getBody());
-            
+
             if (deserialized instanceof ChatMessageResponse response) {
-                // 로컬 웹소켓 클라이언트들에게 브로드캐스트
+                // 채팅 메시지 — 해당 방 구독자(고객 + 관리자) 전체에게 브로드캐스트
                 messagingTemplate.convertAndSend("/sub/chat/room/" + response.roomId(), response);
             } else if (deserialized instanceof ChatRoomResponse roomResponse) {
-                // 관리자 대시보드 웹소켓 구독자들에게 브로드캐스트
+                // 관리자 대시보드 전용 — 전체 방 목록 실시간 갱신 (GREEN만 구독 가능)
                 messagingTemplate.convertAndSend("/sub/chat/rooms/updates", roomResponse);
+                // 고객 전용 — 본인 방 상태 변경 수신 (해당 방 주인만 구독 가능)
+                messagingTemplate.convertAndSend("/sub/chat/room/" + roomResponse.roomId() + "/status", roomResponse);
             }
         } catch (Exception e) {
             log.error("Redis 메시지 역직렬화 실패", e);

@@ -1,6 +1,7 @@
 package org.example.murderhelp.global.config.websocket;
 
 import lombok.RequiredArgsConstructor;
+import org.example.murderhelp.global.error.StompErrorHandler;
 import org.example.murderhelp.global.interceptor.StompAuthInterceptor;
 import org.example.murderhelp.global.resolver.StompPrincipalArgumentResolver;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthInterceptor stompAuthInterceptor;
     private final StompPrincipalArgumentResolver stompPrincipalArgumentResolver;
+    private final StompErrorHandler stompErrorHandler;
+
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -32,6 +35,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws")
             .setAllowedOriginPatterns("*")
             .withSockJS();
+
+        registry.setErrorHandler(stompErrorHandler);
     }
 
     @Override

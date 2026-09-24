@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.murderhelp.global.error.BusinessException;
 import org.example.murderhelp.global.error.ErrorCode;
+import org.example.murderhelp.domain.member.entity.Grade;
 import org.example.murderhelp.domain.member.entity.Member;
 import org.example.murderhelp.domain.member.service.MemberService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -88,7 +89,12 @@ public class ChatMessageService {
         ChatRoom room = chatRoomService.getRoomEntity(request.roomId());
         Member sender = memberService.getMemberById(request.memberId());
         boolean isCustomer = room.isCustomer(sender.getId());
-        
+
+        // 고객이 아닌 발신자는 반드시 GREEN 등급(관리자)이어야 한다.
+        if (!isCustomer && sender.getGrade() != Grade.GREEN) {
+            throw new BusinessException(ErrorCode.CHAT_ACCESS_DENIED);
+        }
+
         if (!room.getStatus().canSendMessage(isCustomer)) {
             throw new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS);
         }

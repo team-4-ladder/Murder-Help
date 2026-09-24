@@ -28,10 +28,12 @@ public class ChatRestController {
     /**
      * 신규 상담 채팅방을 생성한다. 이미 진행 중인 방이 있으면 방 생성을 거부하고,
      * 성공 시 챗봇 환영 메시지 발송까지 한 번에 처리된다.
+     * GREEN 등급(관리자)은 방을 생성할 수 없다.
      *
      * @param memberId 인증된 요청자(고객)의 회원 ID
      * @return 생성된 채팅방 정보
      */
+    @PreAuthorize("!hasRole('GREEN')")
     @PostMapping
     public ApiResponse<ChatRoomResponse> createRoom(@AuthenticationPrincipal Long memberId) {
         return ApiResponse.ok(chatFacade.createRoomAndSendGreeting(memberId));
