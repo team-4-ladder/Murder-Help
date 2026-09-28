@@ -34,7 +34,7 @@ public class ChatRoomService {
     private final ChatLastMessageCache chatLastMessageCache;
 
     /**
-     * 신규 채팅방을 생성한다. 동일 고객에게 WAITING/IN_PROGRESS 상태의 활성 방이 이미 있으면
+     * 신규 채팅방을 생성한다. 동일 고객에게 BOT_MODE/WAITING/IN_PROGRESS 상태의 활성 방이 이미 있으면
      * 생성을 거부한다(1인 1활성방 정책). 생성 직후 방 상태는 BOT_MODE로 시작한다.
      *
      * @param memberId 채팅방을 개설하는 고객의 회원 ID
@@ -45,7 +45,7 @@ public class ChatRoomService {
     public ChatRoomResponse createRoom(Long memberId) {
         boolean hasActiveRoom = chatRoomRepository.existsByCustomerIdAndStatusIn(
                 memberId,
-                List.of(ChatRoomStatus.WAITING, ChatRoomStatus.IN_PROGRESS)
+                List.of(ChatRoomStatus.BOT_MODE, ChatRoomStatus.WAITING, ChatRoomStatus.IN_PROGRESS)
         );
 
         if (hasActiveRoom) {

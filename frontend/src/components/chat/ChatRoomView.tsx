@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useChatRoom } from "./useChatRoom";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { getAccessToken } from "../../api/client";
@@ -12,12 +12,24 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
     isCompleted,
     status,
     isError,
+    sendError,
     showScrollBottom,
     containerRef,
     handleScroll,
     scrollToBottom,
     sendMessage
-  } = useChatRoom(roomId);
+  } = useChatRoom(roomId, isAdmin);
+
+  const [visibleSendError, setVisibleSendError] = useState<string | null>(null);
+
+  // sendError가 세팅되면 화면에 표시하고 3초 후 자동으로 제거
+  // sendError는 매번 새 객체(id 포함)라서 동일한 메시지가 연속으로 와도 항상 재실행된다.
+  useEffect(() => {
+    if (!sendError) return;
+    setVisibleSendError(sendError.message);
+    const timer = setTimeout(() => setVisibleSendError(null), 3000);
+    return () => clearTimeout(timer);
+  }, [sendError]);
 
   const isAdminBotMode = isAdmin && status === "BOT_MODE";
   const isInputDisabled = isCompleted || isAdminBotMode;
@@ -111,6 +123,14 @@ export default function ChatRoomView({ roomId, customerId, isAdmin = false }: { 
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
+      )}
+
+      {/* 메시지 전송 실패 에러 배너 — 3초 후 자동 소멸 */}
+      {visibleSendError && (
+        <div className="px-4 py-2 bg-[#1a0000] border-t border-[#ff4422]/40 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff4422] shrink-0" />
+          <span className="text-[11px] text-[#ff4422] font-mono tracking-wide">{visibleSendError}</span>
+        </div>
       )}
 
       <form onSubmit={send} className="p-3 border-t flex gap-2 border-chat-border bg-[#0a0000]">
